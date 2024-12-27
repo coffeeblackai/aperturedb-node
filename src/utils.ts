@@ -1,5 +1,5 @@
 import { ApertureConfig, ApertureError } from './types';
-import { BaseClient } from './client/base';
+import { BaseClient } from './base';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';

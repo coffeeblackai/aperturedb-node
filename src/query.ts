@@ -1,5 +1,61 @@
-import { ObjectType, QueryParams, QueryCommand, Sort, Constraints, Operations } from './types/query';
 import * as struct from 'python-struct';
+
+// Query types
+export enum ObjectType {
+  Entity = 'Entity',
+  Video = 'Video',
+  Image = 'Image',
+  Frame = 'Frame',
+  Clip = 'Clip',
+  Descriptor = 'Descriptor',
+  Connection = 'Connection'
+}
+
+export interface QueryParams {
+  results?: {
+    all_properties?: boolean;
+    limit?: number;
+    sort?: Sort;
+    list?: string[];
+    group_by_source?: boolean;
+  };
+  _ref?: number;
+  src_query?: {
+    FindEntity: {
+      _ref: number;
+      constraints?: Record<string, any>;
+    };
+  };
+  dst_query?: {
+    FindEntity: {
+      _ref: number;
+      constraints?: Record<string, any>;
+    };
+  };
+  constraints?: Record<string, any>;
+  operations?: Record<string, any>;
+  with_class?: string;
+  class?: string;
+  set?: string;
+  k_neighbors?: number;
+}
+
+export interface QueryCommand {
+  [key: string]: QueryParams;
+}
+
+export interface Sort {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
+export interface Constraints {
+  [key: string]: any;
+}
+
+export interface Operations {
+  [key: string]: any;
+}
 
 export class QueryBuilder {
   static findCommand(oclass: string | ObjectType, params: QueryParams): QueryCommand {
@@ -231,9 +287,14 @@ export class Query {
 
     if (this.next) {
       const [nextCommands, nextBlobs] = this.next.query();
-      Object.values(nextCommands[0])[0].is_connected_to = {
-        ref: this.adjTo
-      };
+      const firstCommand = nextCommands[0];
+      const commandKey = Object.keys(firstCommand)[0];
+      if (firstCommand && commandKey) {
+        const commandValue = firstCommand[commandKey] as Record<string, any>;
+        commandValue.is_connected_to = {
+          ref: this.adjTo
+        };
+      }
       query.push(...nextCommands);
       blobs.push(...nextBlobs);
     }

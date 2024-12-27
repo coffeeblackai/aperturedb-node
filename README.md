@@ -1,13 +1,32 @@
 # ApertureDB Node.js SDK
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+
 A Node.js SDK for interacting with ApertureDB, providing a simple and intuitive interface for database operations.
 
 ## Installation
 
-To install the project from GitHub, use the following command:
+To install directly from GitHub, add the following to your `package.json` dependencies:
+
+```json
+{
+  "dependencies": {
+    "@coffeeblackai/aperturedb-node": "coffeeblackai/aperturedb-node"
+  }
+}
+```
+
+Or install using npm:
 
 ```bash
-npm install https://github.com/coffeeblackai/aperturedb-node.git
+npm install github:coffeeblackai/aperturedb-node
+```
+
+Or using yarn:
+
+```bash
+yarn add github:coffeeblackai/aperturedb-node
 ```
 
 ## Configuration

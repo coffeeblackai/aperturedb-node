@@ -1,5 +1,5 @@
 {
-  "name": "aperturedb-node",
+  "name": "@coffeeblackai/aperturedb-node",
   "version": "1.0.0",
   "description": "Node.js SDK for ApertureDB",
   "main": "dist/index.js",
@@ -9,12 +9,33 @@
     "build": "tsc",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watchAll",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "files": [
     "dist",
     "README.md"
   ],
+  "keywords": [
+    "aperturedb",
+    "database",
+    "sdk",
+    "typescript",
+    "nodejs"
+  ],
+  "author": "CoffeeBlack AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coffeeblackai/aperturedb-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coffeeblackai/aperturedb-node/issues"
+  },
+  "homepage": "https://github.com/coffeeblackai/aperturedb-node#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
     "async-lock": "^1.4.1",
     "dotenv": "^16.3.1",
@@ -24,6 +45,7 @@
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
     "@types/jest": "^29.5.11",
+    "@types/python-struct": "^1.0.4",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
     "tsx": "^4.7.0",
