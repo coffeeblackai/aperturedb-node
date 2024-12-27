@@ -9,6 +9,7 @@ import type { FrameClient } from './frame.js';
 import type { ClipClient } from './clip.js';
 import type { EntityClient } from './entity.js';
 import type { ConnectionClient } from './connection.js';
+import type { LogLevel } from './utils/logger.js';
 
 // Core types
 export interface ApertureConfig {
@@ -36,6 +37,7 @@ export interface ApertureClient {
   readonly clips: ClipClient;
   readonly entities: EntityClient;
   readonly connections: ConnectionClient;
+  setLogLevel(level: LogLevel): void;
 }
 
 export interface AuthResponse {
@@ -191,6 +193,7 @@ export interface VideoMetadata {
   _frame_width?: number;
   _duration_us?: number;
   _uniqueid?: string;
+  _blob?: Buffer;  // Add blob field for video data when requested
   [key: string]: any;  // Allow any properties at the base level
 }
 

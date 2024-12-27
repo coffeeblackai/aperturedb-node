@@ -56,6 +56,12 @@ export class BaseClient {
   protected everConnected: boolean = false;
   protected queryConnectionErrorSuppressionDelta: number = 30000; // 30 seconds in ms
 
+  // Helper function to truncate buffer content
+  protected truncateBuffer(buf: Buffer, maxLen: number = 10): string {
+    const preview = buf.toString('hex', 0, Math.min(maxLen, buf.length));
+    return buf.length > maxLen ? `${preview}... (${buf.length} bytes)` : preview;
+  }
+
   constructor(config?: Partial<ApertureConfig>) {
     // Validate required config values
     const host = config?.host ?? config?.apiUrl ?? process.env.APERTURE_HOST;
@@ -307,11 +313,8 @@ export class BaseClient {
     lengthBuffer.writeUInt32LE(data.length, 0);
     const fullMessage = Buffer.concat([lengthBuffer, data]);
 
-    Logger.trace('_sendMsg: Raw message:', {
-      totalLength: fullMessage.length,
-      lengthPrefix: lengthBuffer.toString('hex'),
-      messageHex: data.toString('hex'),
-      messageUtf8: data.toString('utf8')
+    Logger.trace('_sendMsg:', {
+      totalLength: fullMessage.length
     });
 
     return new Promise((resolve, reject) => {
@@ -394,17 +397,14 @@ export class BaseClient {
       const onData = (chunk: Buffer) => {
         try {
           Logger.trace('_recvMsg: Received chunk:', {
-            chunkLength: chunk.length,
-            chunkHex: chunk.toString('hex'),
-            chunkUtf8: chunk.toString('utf8')
+            chunkLength: chunk.length
           });
 
           // Still reading length prefix
           if (messageLength === -1) {
             lengthBuffer = Buffer.concat([lengthBuffer, chunk]);
             Logger.trace('_recvMsg: Length buffer:', {
-              length: lengthBuffer.length,
-              hex: lengthBuffer.toString('hex')
+              length: lengthBuffer.length
             });
 
             if (lengthBuffer.length >= 4) {
@@ -430,17 +430,13 @@ export class BaseClient {
 
                 Logger.trace('_recvMsg: Extra data after length prefix:', {
                   extraLength: extraData.length,
-                  copied: bytesToCopy,
-                  dataHex: extraData.toString('hex'),
-                  dataUtf8: extraData.toString('utf8')
+                  copied: bytesToCopy
                 });
 
                 // If we have the complete message already
                 if (bytesRead === messageLength) {
                   Logger.trace('_recvMsg: Complete message received:', {
-                    length: messageBuffer.length,
-                    hex: messageBuffer.toString('hex'),
-                    utf8: messageBuffer.toString('utf8')
+                    length: messageBuffer.length
                   });
                   cleanup();
                   resolve(messageBuffer);
@@ -459,17 +455,13 @@ export class BaseClient {
               totalLength: messageLength,
               bytesRead,
               newChunkLength: bytesToCopy,
-              remaining: messageLength - bytesRead,
-              chunkHex: chunk.slice(0, bytesToCopy).toString('hex'),
-              chunkUtf8: chunk.slice(0, bytesToCopy).toString('utf8')
+              remaining: messageLength - bytesRead
             });
 
             // Check if we have the complete message
             if (bytesRead === messageLength) {
               Logger.trace('_recvMsg: Complete message received:', {
-                length: messageBuffer.length,
-                hex: messageBuffer.toString('hex'),
-                utf8: messageBuffer.toString('utf8')
+                length: messageBuffer.length
               });
               cleanup();
               resolve(messageBuffer);
@@ -688,7 +680,12 @@ export class BaseClient {
           Logger.trace('_query: Parsing protobuf response...');
           const responseMessage = QueryMessage.fromBuffer(response);
           const responseStr = responseMessage.getJson();
-          Logger.trace('_query: Parsed response:', responseStr);
+          Logger.trace('_query: Parsed response:', {
+            message: responseStr,
+            blobs: responseMessage.getBlobs().map(blob => `${blob.length} bytes`),
+            blobCount: responseMessage.getBlobs().length,
+            totalBlobBytes: responseMessage.getBlobs().reduce((acc, blob) => acc + blob.length, 0)
+          });
           
           if (responseStr) {
             try {

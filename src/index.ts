@@ -10,6 +10,7 @@ import { ClipClient } from './clip.js';
 import { EntityClient } from './entity.js';
 import { ConnectionClient } from './connection.js';
 import type { ApertureConfig } from './types';
+import { LogLevel } from './utils/logger.js';
 
 export class ApertureClient {
   private static instance: ApertureClient | null = null;
@@ -68,6 +69,10 @@ export class ApertureClient {
    */
   public async rawQuery<T = any>(query: any, blobs: Buffer[] = []): Promise<[T, Buffer[]]> {
     return this.baseClient.query<T>(query, blobs);
+  }
+
+  public setLogLevel(level: LogLevel): void {
+    this.baseClient.setLogLevel(level);
   }
 }
 

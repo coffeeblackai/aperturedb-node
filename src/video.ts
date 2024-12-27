@@ -53,20 +53,26 @@ export class VideoClient {
           "all_properties": true,
           ...options?.results
         },
-        "uniqueids": options?.uniqueids
+        "uniqueids": options?.uniqueids,
+        "blobs": options?.blobs
       }
     }];
 
     type FindVideoResponse = [{
       FindVideo: {
-        videos: VideoMetadata[];
+        entities: VideoMetadata[];
         returned: number;
         status: number;
+        blobs?: Buffer[];
       }
     }];
 
-    const [response] = await this.baseClient.query<FindVideoResponse>(query, []);
-    return response[0].FindVideo.videos[0];
+    const [response, blobs] = await this.baseClient.query<FindVideoResponse>(query, []);
+    const video = response[0].FindVideo.entities[0];
+    if (options?.blobs && blobs.length > 0) {
+      video._blob = blobs[0];
+    }
+    return video;
   }
 
   async findVideos(options?: FindVideoOptions & QueryOptions): Promise<VideoMetadata[]> {
@@ -82,7 +88,8 @@ export class VideoClient {
         "uniqueids": options?.uniqueids,
         "limit": options?.limit,
         "offset": options?.offset,
-        "sort": options?.sort
+        "sort": options?.sort,
+        "blobs": options?.blobs
       }
     }];
 
@@ -91,11 +98,22 @@ export class VideoClient {
         entities: VideoMetadata[];
         returned: number;
         status: number;
+        blobs?: Buffer[];
       }
     }];
 
-    const [response] = await this.baseClient.query<FindVideoResponse>(query, []);
-    return response[0].FindVideo.entities || [];
+    const [response, blobs] = await this.baseClient.query<FindVideoResponse>(query, []);
+    const videos = response[0].FindVideo.entities || [];
+    
+    if (options?.blobs && blobs.length > 0) {
+      videos.forEach((video, index) => {
+        if (index < blobs.length) {
+          video._blob = blobs[index];
+        }
+      });
+    }
+    
+    return videos;
   }
 
   async deleteVideo(constraints: Record<string, any>): Promise<void> {

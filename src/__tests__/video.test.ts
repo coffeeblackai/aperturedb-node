@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client.js';
+import { ApertureClient } from '../index.js';
+import { LogLevel } from '../utils/logger.js';
 import type { VideoMetadata, ApertureConfig } from '../types.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,6 +21,7 @@ describe('Video Operations', () => {
     };
 
     client = ApertureClient.getInstance(config);
+    client.setLogLevel(LogLevel.INFO);
   });
 
   describe('Video CRUD operations', () => {
@@ -32,10 +34,12 @@ describe('Video Operations', () => {
     };
 
     let testVideoId: string;
+    let originalVideoBuffer: Buffer;
 
     beforeAll(async () => {
       // Ensure test video exists
       expect(fs.existsSync(testVideoPath)).toBeTruthy();
+      originalVideoBuffer = fs.readFileSync(testVideoPath);
 
       // Clean up any existing test videos
       const existingVideos = await client.videos.findVideos({ 
@@ -49,6 +53,25 @@ describe('Video Operations', () => {
           await client.videos.deleteVideo({ _uniqueid: ["==", video._uniqueid] });
         }
       }
+
+      // Create test video for blob tests
+      const video = await client.videos.addVideo({
+        blob: originalVideoBuffer,
+        properties: testVideoProperties
+      });
+
+      // Get video ID for tests
+      const videos = await client.videos.findVideos({ 
+        constraints: { name: ['==', testVideoProperties.name] }
+      });
+      expect(videos.length).toBe(1);
+      testVideoId = videos[0]._uniqueid!;
+    });
+
+    // Add wait between each test
+    beforeEach(async () => {
+      // Wait for 500ms between tests to ensure operations are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
 
     // test('should create a new video', async () => {
@@ -105,6 +128,68 @@ describe('Video Operations', () => {
       expect(videos.length).toBe(0);
     });
 
+    describe('Blob handling', () => {
+      test('findVideo should return video with blob when requested', async () => {
+        const video = await client.videos.findVideo({ 
+          constraints: { _uniqueid: ['==', testVideoId] },
+          blobs: true
+        });
+
+        expect(video).toBeDefined();
+        expect(video._uniqueid).toBe(testVideoId);
+        expect(video._blob).toBeDefined();
+        expect(Buffer.isBuffer(video._blob)).toBe(true);
+        expect(video._blob!.length).toBeGreaterThan(0);
+        
+        // Verify the blob matches original video
+        expect(video._blob!.equals(originalVideoBuffer)).toBe(true);
+        
+        // Verify core properties match
+        expect(video.name).toBe(testVideoProperties.name);
+        expect(video.description).toBe(testVideoProperties.description);
+      });
+
+      test('findVideos should return videos with blobs when requested', async () => {
+        const videos = await client.videos.findVideos({ 
+          constraints: { _uniqueid: ['==', testVideoId] },
+          blobs: true
+        });
+
+        expect(videos).toHaveLength(1);
+        const video = videos[0];
+        expect(video._uniqueid).toBe(testVideoId);
+        expect(video._blob).toBeDefined();
+        expect(Buffer.isBuffer(video._blob)).toBe(true);
+        expect(video._blob!.length).toBeGreaterThan(0);
+        
+        // Verify the blob matches original video
+        expect(video._blob!.equals(originalVideoBuffer)).toBe(true);
+      });
+
+      test('findVideo should not return blob when not requested', async () => {
+        const video = await client.videos.findVideo({ 
+          constraints: { _uniqueid: ['==', testVideoId] },
+          blobs: false
+        });
+
+        expect(video).toBeDefined();
+        expect(video._uniqueid).toBe(testVideoId);
+        expect(video._blob).toBeUndefined();
+      });
+
+      test('findVideos should not return blobs when not requested', async () => {
+        const videos = await client.videos.findVideos({ 
+          constraints: { _uniqueid: ['==', testVideoId] },
+          blobs: false
+        });
+
+        expect(videos).toHaveLength(1);
+        const video = videos[0];
+        expect(video._uniqueid).toBe(testVideoId);
+        expect(video._blob).toBeUndefined();
+      });
+    });
+
     test('should delete video', async () => {
       await client.videos.deleteVideo({ _uniqueid: ["==", testVideoId] });
 
@@ -112,12 +197,14 @@ describe('Video Operations', () => {
         constraints: { _uniqueid: ['==', testVideoId] }
       });
       expect(videos.length).toBe(0);
+      
+      // Clear testVideoId since we've deleted it
+      testVideoId = '';
     });
 
     afterAll(async () => {
-        console.log('testVideoId', testVideoId);
       if (testVideoId) {
-        // Cleanup in case any test failed
+        // Only cleanup if the deletion test didn't run or failed
         try {
           await client.videos.deleteVideo({ _uniqueid: ["==", testVideoId] });
         } catch (error) {
