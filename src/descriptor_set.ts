@@ -1,9 +1,9 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   DescriptorSet,
   QueryOptions,
   DescriptorSetResponse
-} from './types';
+} from './types.js';
 
 export class DescriptorSetClient {
   private baseClient: BaseClient;

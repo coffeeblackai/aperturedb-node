@@ -1,5 +1,5 @@
-import { ApertureConfig, ApertureError } from './types';
-import { BaseClient } from './base';
+import { ApertureConfig, ApertureError } from './types.js';
+import { BaseClient } from './base.js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';

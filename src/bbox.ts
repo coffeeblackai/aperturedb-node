@@ -1,10 +1,10 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   BoundingBoxMetadata,
   CreateBoundingBoxInput,
   FindBoundingBoxOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class BoundingBoxClient {
   private baseClient: BaseClient;

@@ -2,8 +2,8 @@ import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 import * as tls from 'tls';
 import AsyncLock from 'async-lock';
-import { ApertureConfig } from './types';
-import { QueryMessage } from './proto/queryMessage';
+import { ApertureConfig } from './types.js';
+import { QueryMessage } from './proto/queryMessage.js';
 
 const PROTOCOL_VERSION = 1;
 

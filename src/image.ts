@@ -1,10 +1,10 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   ImageMetadata,
   CreateImageInput,
   FindImageOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class ImageClient {
   private baseClient: BaseClient;

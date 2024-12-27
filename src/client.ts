@@ -1,1 +1,1 @@
-export { ApertureClient } from './index'; 
+export { ApertureClient } from './index.js'; 

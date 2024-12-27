@@ -1,11 +1,11 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   FrameMetadata,
   CreateFrameInput,
   UpdateFrameInput,
   FindFrameOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class FrameClient {
   private baseClient: BaseClient;
@@ -265,17 +265,26 @@ export class FrameClient {
     }];
 
     const [response] = await this.baseClient.query(query, []);
+    
+    // Check if response is an array with two elements
     if (!Array.isArray(response) || response.length !== 2) {
+      return [];
+    }
+
+    // Check if both FindVideo and FindFrame exist in the response
+    if (!('FindVideo' in response[0]) || !('FindFrame' in response[1])) {
       return [];
     }
 
     const findVideo = response[0].FindVideo;
     const findFrame = response[1].FindFrame;
 
+    // Check if both operations were successful and have valid status
     if (!findVideo || !findFrame || findVideo.status !== 0 || findFrame.status !== 0) {
       return [];
     }
 
+    // Return the frame entities if they exist
     return findFrame.entities || [];
   }
 

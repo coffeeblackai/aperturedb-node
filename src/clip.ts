@@ -1,11 +1,11 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   ClipMetadata,
   CreateClipInput,
   UpdateClipInput,
   FindClipOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class ClipClient {
   private baseClient: BaseClient;

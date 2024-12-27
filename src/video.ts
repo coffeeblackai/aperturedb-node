@@ -1,10 +1,10 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   VideoMetadata,
   CreateVideoInput,
   FindVideoOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class VideoClient {
   private baseClient: BaseClient;

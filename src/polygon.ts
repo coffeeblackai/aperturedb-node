@@ -1,11 +1,5 @@
-import { BaseClient } from './base';
-import {
-  PolygonMetadata,
-  CreatePolygonInput,
-  FindPolygonOptions,
-  QueryOptions,
-  DeletePolygonOptions
-} from './types';
+import { BaseClient } from './base.js';
+import { PolygonMetadata, CreatePolygonInput, FindPolygonOptions, QueryOptions } from './types.js';
 
 export class PolygonClient {
   private baseClient: BaseClient;

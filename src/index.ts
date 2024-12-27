@@ -1,14 +1,14 @@
-import { BaseClient } from './base';
-import { ImageClient } from './image';
-import { DescriptorClient } from './descriptor';
-import { DescriptorSetClient } from './descriptor_set';
-import { PolygonClient } from './polygon';
-import { BoundingBoxClient } from './bbox';
-import { VideoClient } from './video';
-import { FrameClient } from './frame';
-import { ClipClient } from './clip';
-import { EntityClient } from './entity';
-import { ConnectionClient } from './connection';
+import { BaseClient } from './base.js';
+import { ImageClient } from './image.js';
+import { DescriptorClient } from './descriptor.js';
+import { DescriptorSetClient } from './descriptor_set.js';
+import { PolygonClient } from './polygon.js';
+import { BoundingBoxClient } from './bbox.js';
+import { VideoClient } from './video.js';
+import { FrameClient } from './frame.js';
+import { ClipClient } from './clip.js';
+import { EntityClient } from './entity.js';
+import { ConnectionClient } from './connection.js';
 import type { ApertureConfig } from './types';
 
 export class ApertureClient {
@@ -77,14 +77,14 @@ export function getClient(config?: Partial<ApertureConfig>): ApertureClient {
 }
 
 // Export the client types for type information
-export { BaseClient } from './base';
-export { ImageClient } from './image';
-export { DescriptorClient } from './descriptor';
-export { DescriptorSetClient } from './descriptor_set';
-export { PolygonClient } from './polygon';
-export { BoundingBoxClient } from './bbox';
-export { VideoClient } from './video';
-export { FrameClient } from './frame';
-export { ClipClient } from './clip';
-export { EntityClient } from './entity';
-export { ConnectionClient } from './connection'; 
+export { BaseClient } from './base.js';
+export { ImageClient } from './image.js';
+export { DescriptorClient } from './descriptor.js';
+export { DescriptorSetClient } from './descriptor_set.js';
+export { PolygonClient } from './polygon.js';
+export { BoundingBoxClient } from './bbox.js';
+export { VideoClient } from './video.js';
+export { FrameClient } from './frame.js';
+export { ClipClient } from './clip.js';
+export { EntityClient } from './entity.js';
+export { ConnectionClient } from './connection.js'; 

@@ -1,14 +1,14 @@
 // Import client types
-import type { ImageClient } from './image';
-import type { DescriptorClient } from './descriptor';
-import type { DescriptorSetClient } from './descriptor_set';
-import type { PolygonClient } from './polygon';
-import type { BoundingBoxClient } from './bbox';
-import type { VideoClient } from './video';
-import type { FrameClient } from './frame';
-import type { ClipClient } from './clip';
-import type { EntityClient } from './entity';
-import type { ConnectionClient } from './connection';
+import type { ImageClient } from './image.js';
+import type { DescriptorClient } from './descriptor.js';
+import type { DescriptorSetClient } from './descriptor_set.js';
+import type { PolygonClient } from './polygon.js';
+import type { BoundingBoxClient } from './bbox.js';
+import type { VideoClient } from './video.js';
+import type { FrameClient } from './frame.js';
+import type { ClipClient } from './clip.js';
+import type { EntityClient } from './entity.js';
+import type { ConnectionClient } from './connection.js';
 
 // Core types
 export interface ApertureConfig {
@@ -409,4 +409,27 @@ export interface Connection {
   updated_at?: string;
   _uniqueid?: string;
   [key: string]: any;  // Allow any custom properties to be destructured at the base level
+}
+
+export interface EntityMetadata {
+  class: string;
+  created_at?: string;
+  updated_at?: string;
+  _uniqueid?: string;
+  [key: string]: any;  
+}
+
+export interface CreateEntityInput {
+  class: string;
+  properties?: Record<string, any>;
+}
+
+export interface FindEntityOptions {
+  with_class?: string;
+  constraints?: Record<string, any>;
+  results?: {
+    all_properties?: boolean;
+    properties?: string[];
+  };
+  uniqueids?: string[];
 } 

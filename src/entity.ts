@@ -1,8 +1,5 @@
-import { BaseClient } from './base';
-import {
-  EntityResponse,
-  QueryOptions
-} from './types';
+import { BaseClient } from './base.js';
+import { EntityMetadata, CreateEntityInput, FindEntityOptions, QueryOptions } from './types.js';
 
 export class EntityClient {
   private baseClient: BaseClient;
@@ -11,7 +8,7 @@ export class EntityClient {
     this.baseClient = baseClient;
   }
 
-  private isFindEntityResponse(response: unknown): response is { FindEntity: { entities: Omit<EntityResponse, 'class'>[]; returned: number; status: number } }[] {
+  private isFindEntityResponse(response: unknown): response is { FindEntity: { entities: Omit<EntityMetadata, 'class'>[]; returned: number; status: number } }[] {
     return Array.isArray(response) && 
            response.length > 0 && 
            'FindEntity' in response[0] &&
@@ -49,7 +46,7 @@ export class EntityClient {
            'status' in response[0].UpdateEntity;
   }
 
-  async findEntities(options: { with_class?: string; constraints?: Record<string, any>; results?: Record<string, any>; uniqueids?: string[] } & QueryOptions = {}): Promise<EntityResponse[]> {
+  async findEntities(options: { with_class?: string; constraints?: Record<string, any>; results?: Record<string, any>; uniqueids?: string[] } & QueryOptions = {}): Promise<EntityMetadata[]> {
     await this.baseClient.ensureAuthenticated();
 
     const query = [{
@@ -78,7 +75,7 @@ export class EntityClient {
     }));
   }
 
-  async addEntity(entityClass: string, properties: Record<string, any> = {}): Promise<EntityResponse> {
+  async addEntity(entityClass: string, properties: Record<string, any> = {}): Promise<EntityMetadata> {
     await this.baseClient.ensureAuthenticated();
 
     const query = [{

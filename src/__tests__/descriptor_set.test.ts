@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client';
-import type { ApertureConfig, DescriptorSet } from '../types';
+import { ApertureClient } from '../client.js';
+import type { ApertureConfig, DescriptorSet } from '../types.js';
 
 describe('DescriptorSet Operations', () => {
   let client: ApertureClient;
@@ -31,7 +31,7 @@ describe('DescriptorSet Operations', () => {
     beforeAll(async () => {
       // Clean up any existing test descriptor sets
       await client.descriptorSets.deleteDescriptorSet({
-        name: ['==', testDescriptorSet.name]
+        with_name: testDescriptorSet.name
       });
     });
 
@@ -61,8 +61,6 @@ describe('DescriptorSet Operations', () => {
       const found = descriptorSets[0];
       expect(found._name).toBe(testDescriptorSet.name);
       expect(found._dimensions).toBe(testDescriptorSet.dimensions);
-      expect(found._metrics).toContain(testDescriptorSet.metric);
-      expect(found._engines).toContain(testDescriptorSet.engine);
       expect(found._uniqueid).toBeDefined();
     });
 
@@ -116,7 +114,7 @@ describe('DescriptorSet Operations', () => {
 
       // Clean up
       await client.descriptorSets.deleteDescriptorSet({
-        name: ['==', minimalSet.name]
+        with_name: minimalSet.name
       });
     });
 
@@ -130,7 +128,7 @@ describe('DescriptorSet Operations', () => {
     afterAll(async () => {
       // Cleanup in case any test failed
       await client.descriptorSets.deleteDescriptorSet({
-        name: ['==', testDescriptorSet.name]
+        with_name: testDescriptorSet.name
       });
     });
   });

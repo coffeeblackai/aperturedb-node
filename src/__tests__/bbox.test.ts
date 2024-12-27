@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client';
-import type { ImageMetadata, BoundingBoxMetadata, ApertureConfig } from '../types';
+import { ApertureClient } from '../client.js';
+import type { ImageMetadata, BoundingBoxMetadata, ApertureConfig } from '../types.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

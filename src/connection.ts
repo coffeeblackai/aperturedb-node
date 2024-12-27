@@ -1,10 +1,10 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   Connection,
   QueryOptions,
   Reference,
   Entity
-} from './types';
+} from './types.js';
 
 // Define possible operation responses
 type OperationResponse = {

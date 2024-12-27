@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client';
-import type { ApertureConfig } from '../types';
+import { ApertureClient } from '../client.js';
+import type { ApertureConfig } from '../types.js';
 
 describe('Descriptor Operations', () => {
   let client: ApertureClient;

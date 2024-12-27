@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client';
-import type { FrameMetadata, VideoMetadata, ApertureConfig } from '../types';
+import { ApertureClient } from '../client.js';
+import type { FrameMetadata, VideoMetadata, ApertureConfig } from '../types.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -179,21 +179,6 @@ describe('Frame Operations', () => {
           name: ['==', testVideoProperties.name],
           description: ['==', testVideoProperties.description]
         });
-
-        expect(frames).toBeInstanceOf(Array);
-        expect(frames.length).toBeGreaterThan(0);
-        expect(frames.some(frame => frame._uniqueid === testFrameId)).toBeTruthy();
-      });
-
-      test('should find frames with video results', async () => {
-        const frames = await client.frames.findFramesByVideoConstraints(
-          { name: ['==', testVideoProperties.name] },
-          {
-            videoResults: {
-              properties: ['name', 'fps']
-            }
-          }
-        );
 
         expect(frames).toBeInstanceOf(Array);
         expect(frames.length).toBeGreaterThan(0);

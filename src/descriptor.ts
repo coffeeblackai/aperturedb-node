@@ -1,4 +1,4 @@
-import { BaseClient } from './base';
+import { BaseClient } from './base.js';
 import {
   DescriptorMetadata,
   CreateDescriptorInput,
@@ -6,7 +6,7 @@ import {
   FindDescriptorBatchOptions,
   ClassifyDescriptorOptions,
   QueryOptions
-} from './types';
+} from './types.js';
 
 export class DescriptorClient {
   private baseClient: BaseClient;
