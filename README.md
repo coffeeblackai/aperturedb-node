@@ -7,8 +7,6 @@ A Node.js SDK for interacting with ApertureDB, providing a simple and intuitive 
 To install the project from GitHub, use the following command:
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
 npm install https://github.com/coffeeblackai/aperturedb-node.git
 ```
 
