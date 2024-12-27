@@ -6,6 +6,7 @@ import {
   FindFrameOptions,
   QueryOptions
 } from './types.js';
+import { Logger } from './utils/logger.js';
 
 export class FrameClient {
   private baseClient: BaseClient;
@@ -19,50 +20,49 @@ export class FrameClient {
     { AddFrame: { status: number } }
   ] {
     if (!Array.isArray(response)) {
-      console.error('Response is not an array:', response);
-      return false;
+      Logger.error('Response is not an array:', response);
+      throw new Error('Invalid response format');
     }
     
     if (response.length !== 2) {
-      console.error('Response array length is not 2:', response.length);
-      return false;
+      Logger.error('Response array length is not 2:', response.length);
+      throw new Error('Invalid response length');
     }
     
-    console.log('Debug - response[0]:', response[0]);
-    console.log('Debug - FindVideo in response[0]:', 'FindVideo' in response[0]);
-    console.log('Debug - typeof response[0]:', typeof response[0]);
-    
-    if (!response[0] || !('FindVideo' in response[0])) {
-      console.error('First element missing FindVideo:', response[0]);
-      return false;
+    if (!('FindVideo' in response[0])) {
+      Logger.trace('Debug - response[0]:', response[0]);
+      Logger.trace('Debug - FindVideo in response[0]:', 'FindVideo' in response[0]);
+      Logger.trace('Debug - typeof response[0]:', typeof response[0]);
+      Logger.error('First element missing FindVideo:', response[0]);
+      throw new Error('Invalid response format');
     }
     
-    if (!response[1] || !('AddFrame' in response[1])) {
-      console.error('Second element missing AddFrame:', response[1]);
-      return false;
+    if (!('AddFrame' in response[1])) {
+      Logger.error('Second element missing AddFrame:', response[1]);
+      throw new Error('Invalid response format');
     }
 
     const findVideo = response[0].FindVideo;
     const addFrame = response[1].AddFrame;
     
-    if (!findVideo || typeof findVideo !== 'object') {
-      console.error('FindVideo is not an object:', findVideo);
-      return false;
+    if (typeof findVideo !== 'object' || findVideo === null) {
+      Logger.error('FindVideo is not an object:', findVideo);
+      throw new Error('Invalid FindVideo format');
     }
     
-    if (!addFrame || typeof addFrame !== 'object') {
-      console.error('AddFrame is not an object:', addFrame);
-      return false;
+    if (typeof addFrame !== 'object' || addFrame === null) {
+      Logger.error('AddFrame is not an object:', addFrame);
+      throw new Error('Invalid AddFrame format');
     }
     
-    if (!('status' in findVideo) || !('returned' in findVideo)) {
-      console.error('FindVideo missing required properties:', findVideo);
-      return false;
+    if (!('status' in findVideo) || !('entities' in findVideo)) {
+      Logger.error('FindVideo missing required properties:', findVideo);
+      throw new Error('Invalid FindVideo format');
     }
     
     if (!('status' in addFrame)) {
-      console.error('AddFrame missing status:', addFrame);
-      return false;
+      Logger.error('AddFrame missing status:', addFrame);
+      throw new Error('Invalid AddFrame format');
     }
 
     return true;

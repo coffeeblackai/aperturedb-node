@@ -1,5 +1,6 @@
 import { BaseClient } from './base.js';
 import { PolygonMetadata, CreatePolygonInput, FindPolygonOptions, QueryOptions } from './types.js';
+import { Logger } from './utils/logger.js';
 
 export class PolygonClient {
   private baseClient: BaseClient;
@@ -13,46 +14,46 @@ export class PolygonClient {
     { AddPolygon: { status: number; _uniqueid?: string } }
   ] {
     if (!Array.isArray(response)) {
-      console.error('Response is not an array:', response);
-      return false;
+      Logger.error('Response is not an array:', response);
+      throw new Error('Invalid response format');
     }
     
     if (response.length !== 2) {
-      console.error('Response array length is not 2:', response.length);
-      return false;
+      Logger.error('Response array length is not 2:', response.length);
+      throw new Error('Invalid response length');
     }
     
-    if (!response[0] || !('FindImage' in response[0])) {
-      console.error('First element missing FindImage:', response[0]);
-      return false;
+    if (!('FindImage' in response[0])) {
+      Logger.error('First element missing FindImage:', response[0]);
+      throw new Error('Invalid response format');
     }
     
-    if (!response[1] || !('AddPolygon' in response[1])) {
-      console.error('Second element missing AddPolygon:', response[1]);
-      return false;
+    if (!('AddPolygon' in response[1])) {
+      Logger.error('Second element missing AddPolygon:', response[1]);
+      throw new Error('Invalid response format');
     }
 
     const findImage = response[0].FindImage;
     const addPolygon = response[1].AddPolygon;
     
-    if (!findImage || typeof findImage !== 'object') {
-      console.error('FindImage is not an object:', findImage);
-      return false;
+    if (typeof findImage !== 'object' || findImage === null) {
+      Logger.error('FindImage is not an object:', findImage);
+      throw new Error('Invalid FindImage format');
     }
     
-    if (!addPolygon || typeof addPolygon !== 'object') {
-      console.error('AddPolygon is not an object:', addPolygon);
-      return false;
+    if (typeof addPolygon !== 'object' || addPolygon === null) {
+      Logger.error('AddPolygon is not an object:', addPolygon);
+      throw new Error('Invalid AddPolygon format');
     }
     
-    if (!('status' in findImage) || !('returned' in findImage)) {
-      console.error('FindImage missing required properties:', findImage);
-      return false;
+    if (!('status' in findImage) || !('entities' in findImage)) {
+      Logger.error('FindImage missing required properties:', findImage);
+      throw new Error('Invalid FindImage format');
     }
     
     if (!('status' in addPolygon)) {
-      console.error('AddPolygon missing required properties:', addPolygon);
-      return false;
+      Logger.error('AddPolygon missing required properties:', addPolygon);
+      throw new Error('Invalid AddPolygon format');
     }
 
     return true;

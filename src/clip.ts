@@ -6,6 +6,7 @@ import {
   FindClipOptions,
   QueryOptions
 } from './types.js';
+import { Logger } from './utils/logger.js';
 
 export class ClipClient {
   private baseClient: BaseClient;
@@ -19,46 +20,46 @@ export class ClipClient {
     { AddClip: { status: number } }
   ] {
     if (!Array.isArray(response)) {
-      console.error('Response is not an array:', response);
-      return false;
+      Logger.error('Response is not an array:', response);
+      throw new Error('Invalid response format');
     }
     
     if (response.length !== 2) {
-      console.error('Response array length is not 2:', response.length);
-      return false;
+      Logger.error('Response array length is not 2:', response.length);
+      throw new Error('Invalid response length');
     }
     
-    if (!response[0] || !('FindVideo' in response[0])) {
-      console.error('First element missing FindVideo:', response[0]);
-      return false;
+    if (!('FindVideo' in response[0])) {
+      Logger.error('First element missing FindVideo:', response[0]);
+      throw new Error('Invalid response format');
     }
     
-    if (!response[1] || !('AddClip' in response[1])) {
-      console.error('Second element missing AddClip:', response[1]);
-      return false;
+    if (!('AddClip' in response[1])) {
+      Logger.error('Second element missing AddClip:', response[1]);
+      throw new Error('Invalid response format');
     }
 
     const findVideo = response[0].FindVideo;
     const addClip = response[1].AddClip;
     
-    if (!findVideo || typeof findVideo !== 'object') {
-      console.error('FindVideo is not an object:', findVideo);
-      return false;
+    if (typeof findVideo !== 'object' || findVideo === null) {
+      Logger.error('FindVideo is not an object:', findVideo);
+      throw new Error('Invalid FindVideo format');
     }
     
-    if (!addClip || typeof addClip !== 'object') {
-      console.error('AddClip is not an object:', addClip);
-      return false;
+    if (typeof addClip !== 'object' || addClip === null) {
+      Logger.error('AddClip is not an object:', addClip);
+      throw new Error('Invalid AddClip format');
     }
     
-    if (!('status' in findVideo) || !('returned' in findVideo)) {
-      console.error('FindVideo missing required properties:', findVideo);
-      return false;
+    if (!('status' in findVideo) || !('entities' in findVideo)) {
+      Logger.error('FindVideo missing required properties:', findVideo);
+      throw new Error('Invalid FindVideo format');
     }
     
     if (!('status' in addClip)) {
-      console.error('AddClip missing status:', addClip);
-      return false;
+      Logger.error('AddClip missing status:', addClip);
+      throw new Error('Invalid AddClip format');
     }
 
     return true;

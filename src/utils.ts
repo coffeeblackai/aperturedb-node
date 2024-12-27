@@ -1,199 +1,116 @@
-import { ApertureConfig, ApertureError } from './types.js';
-import { BaseClient } from './base.js';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-import * as fs from 'fs';
+import { config } from 'dotenv';
+import { Logger } from './utils/logger.js';
 
-/**
- * Create a configuration from a JSON object or string
- */
-export function createConfigurationFromJson(
-  config: Record<string, any> | string,
-  name?: string,
-  nameRequired: boolean = false
-): ApertureConfig {
-  let configObj: Record<string, any>;
+try {
+  config();
+} catch (error) {
+  Logger.warn('Could not load .env file');
+}
+
+export function checkQueryResponse(response: any): boolean {
+  if (!response) return false;
   
-  if (typeof config === 'string') {
-    try {
-      configObj = JSON.parse(config);
-    } catch (e) {
-      throw new Error(`Problem decoding JSON config string: ${e}`);
+  if (Array.isArray(response)) {
+    return response.every(item => checkQueryResponse(item));
+  }
+  
+  if (typeof response === 'object') {
+    if ('status' in response) {
+      return response.status === 0;
     }
-  } else {
-    configObj = config;
+    return Object.values(response).every(value => checkQueryResponse(value));
   }
-
-  // Remove password before logging
-  const cleanConfig = { ...configObj };
-  delete cleanConfig.password;
-
-  // Required fields
-  if (!configObj.host) throw new Error(`host is required in the configuration: ${JSON.stringify(cleanConfig)}`);
-  if (!configObj.username) throw new Error(`username is required in the configuration: ${JSON.stringify(cleanConfig)}`);
-  if (!configObj.password) throw new Error(`password is required in the configuration: ${JSON.stringify(cleanConfig)}`);
-
-  // Default values
-  if (!configObj.port) configObj.port = 55555;
-
-  if (name) {
-    configObj.name = name;
-  } else if (nameRequired && !configObj.name) {
-    throw new Error(`name is required in the configuration: ${JSON.stringify(cleanConfig)}`);
-  } else if (!configObj.name) {
-    configObj.name = 'from_json';
-  }
-
-  return configObj as ApertureConfig;
+  
+  return false;
 }
 
-/**
- * Get a secret from environment variables or .env file
- */
-export function getSecret(name: string): string | undefined {
-  // First check environment variables
-  const envValue = process.env[name];
-  if (envValue) return envValue;
-
-  // Then check .env file
-  try {
-    dotenv.config();
-    return process.env[name];
-  } catch (error) {
-    console.warn('Could not load .env file');
-    return undefined;
+export function checkQueryResponsePartial(response: any): string[] {
+  const warnings: string[] = [];
+  
+  if (!response) {
+    warnings.push('Empty response');
+    return warnings;
   }
-}
-
-/**
- * Execute a query with proper error handling and logging
- */
-export async function executeQuery(
-  client: BaseClient,
-  query: any[],
-  blobs: Buffer[] = [],
-  successStatuses: number[] = [0],
-  responseHandler?: (query: any[], queryBlobs: Buffer[], response: any[], responseBlobs: Buffer[] | null, cmdIndex?: number) => void,
-  commandsPerQuery: number = 1,
-  blobsPerQuery: number = 0,
-  strictResponseValidation: boolean = false,
-  cmdIndex?: number
-): Promise<[number, any[], Buffer[]]> {
-  let result = 0;
-  console.debug('Query=', query);
-
-  try {
-    const [response, responseBlobs] = await client.query(query, blobs);
-    console.debug('Response=', response);
-
-    if (client.lastQueryOk()) {
-      if (responseHandler) {
-        try {
-          mapResponseToHandler(
-            responseHandler,
-            query,
-            blobs,
-            response,
-            responseBlobs,
-            commandsPerQuery,
-            blobsPerQuery,
-            cmdIndex
-          );
-        } catch (error) {
-          console.error(error);
-          if (strictResponseValidation) {
-            throw error;
-          }
-        }
+  
+  if (Array.isArray(response)) {
+    response.forEach((item, index) => {
+      const itemWarnings = checkQueryResponsePartial(item);
+      warnings.push(...itemWarnings.map(w => `[${index}] ${w}`));
+    });
+    return warnings;
+  }
+  
+  if (typeof response === 'object') {
+    if ('status' in response) {
+      if (response.status !== 0) {
+        warnings.push(`Status ${response.status}: ${response.info || 'No info'}`);
       }
     } else {
-      console.error('Failed query =', query, 'with response =', response);
-      result = 1;
-    }
-
-    const statuses: Record<number, any[]> = {};
-    
-    if (!Array.isArray(response)) {
-      statuses[response.status] = [response];
-    } else {
-      response.forEach(res => {
-        Object.keys(res).forEach(cmd => {
-          const status = res[cmd].status;
-          if (!statuses[status]) statuses[status] = [];
-          statuses[status].push(res);
-        });
+      Object.entries(response).forEach(([key, value]) => {
+        const valueWarnings = checkQueryResponsePartial(value);
+        warnings.push(...valueWarnings.map(w => `${key}: ${w}`));
       });
     }
+  }
+  
+  return warnings;
+}
 
-    if (result !== 1) {
-      const warnList = [];
-      for (const [status, results] of Object.entries(statuses)) {
-        if (!successStatuses.includes(Number(status))) {
-          warnList.push(...results);
-        }
-      }
-      if (warnList.length > 0) {
-        console.warn('Partial errors:', JSON.stringify(query), JSON.stringify(warnList));
-        result = 2;
-      }
-    }
-
-    return [result, response, responseBlobs];
+export async function executeQuery(client: any, query: any, blobs: Buffer[] = []): Promise<any> {
+  Logger.debug('Query=', query);
+  try {
+    const [response] = await client.query(query, blobs);
+    Logger.debug('Response=', response);
+    return response;
   } catch (error) {
-    console.error('Query execution error:', error);
+    if (error instanceof Error) {
+      Logger.error(error.message);
+    } else {
+      Logger.error('Unknown error occurred during query execution');
+    }
     throw error;
   }
 }
 
-/**
- * Map response to handler function
- */
-function mapResponseToHandler(
-  handler: (query: any[], queryBlobs: Buffer[], response: any[], responseBlobs: Buffer[] | null, cmdIndex?: number) => void,
-  query: any[],
-  queryBlobs: Buffer[],
-  response: any[],
-  responseBlobs: Buffer[],
-  commandsPerQuery: number,
-  blobsPerQuery: number,
-  cmdIndexOffset?: number
-): void {
-  let blobsReturned = 0;
-
-  for (let i = 0; i < Math.ceil(query.length / commandsPerQuery); i++) {
-    const start = i * commandsPerQuery;
-    const end = start + commandsPerQuery;
-    const blobsStart = i * blobsPerQuery;
-    const blobsEnd = blobsStart + blobsPerQuery;
-
-    let bCount = 0;
-    if (Array.isArray(response)) {
-      query.slice(start, end).forEach((req, idx) => {
-        const resp = response[start + idx];
-        Object.keys(req).forEach(k => {
-          const blobReturningCommands = ['FindImage', 'FindBlob', 'FindVideo', 'FindDescriptor', 'FindBoundingBox'];
-          if (blobReturningCommands.includes(k) && req[k].blobs) {
-            bCount += resp[k].returned;
-          }
-        });
-      });
-    }
-
-    handler(
-      query.slice(start, end),
-      queryBlobs.slice(blobsStart, blobsEnd),
-      Array.isArray(response) ? response.slice(start, end) : response,
-      responseBlobs.slice(blobsReturned, blobsReturned + bCount),
-      cmdIndexOffset !== undefined ? cmdIndexOffset + i : undefined
-    );
-
-    blobsReturned += bCount;
+export async function executeQueryWithCheck(client: any, query: any, blobs: Buffer[] = []): Promise<any> {
+  const response = await executeQuery(client, query, blobs);
+  if (!checkQueryResponse(response)) {
+    Logger.error('Failed query =', query, 'with response =', response);
+    throw new Error('Query failed');
   }
+  return response;
 }
 
-/**
- * Issue a deprecation warning
- */
-export function issueDeprecationWarning(oldName: string, newName: string): void {
-  console.warn(`${oldName} is deprecated and will be removed in a future release. Use ${newName} instead.`);
+export async function executeQueryWithPartialCheck(client: any, query: any, blobs: Buffer[] = []): Promise<[any, string[]]> {
+  const response = await executeQuery(client, query, blobs);
+  const warnList = checkQueryResponsePartial(response);
+  if (warnList.length > 0) {
+    Logger.warn('Partial errors:', JSON.stringify(query), JSON.stringify(warnList));
+  }
+  return [response, warnList];
+}
+
+export async function executeQueryWithRetry(client: any, query: any, blobs: Buffer[] = [], maxRetries: number = 3): Promise<any> {
+  let lastError: Error | undefined;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await executeQueryWithCheck(client, query, blobs);
+    } catch (error) {
+      if (error instanceof Error) {
+        lastError = error;
+        Logger.error('Query execution error:', error.message);
+      } else {
+        lastError = new Error('Unknown error during query execution');
+        Logger.error('Query execution error: Unknown error');
+      }
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+      }
+    }
+  }
+  throw lastError || new Error('Query failed after retries');
+}
+
+export function deprecate(oldName: string, newName: string): void {
+  Logger.warn(`${oldName} is deprecated and will be removed in a future release. Use ${newName} instead.`);
 } 
