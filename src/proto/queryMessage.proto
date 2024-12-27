@@ -1,0 +1,8 @@
+syntax = "proto3";
+package VDMS.protobufs;
+
+message queryMessage {
+  string json = 1;
+  repeated bytes blobs = 2;
+  string token = 3;
+} 
