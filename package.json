@@ -61,7 +61,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/proto && cp src/proto/*.proto dist/proto/",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --watchAll",
     "prepublishOnly": "npm run build",
@@ -69,7 +69,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "src/proto/*.proto"
   ],
   "keywords": [
     "aperturedb",
