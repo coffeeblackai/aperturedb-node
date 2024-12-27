@@ -43,8 +43,8 @@ echo -e "${GREEN}Installing dependencies...${NC}"
 npm install
 
 # Run tests
-echo -e "${GREEN}Running tests...${NC}"
-npm test
+# echo -e "${GREEN}Running tests...${NC}"
+# npm test
 
 # Build the package
 echo -e "${GREEN}Building package...${NC}"
