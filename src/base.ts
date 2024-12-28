@@ -787,20 +787,19 @@ export class BaseClient implements QueryExecutor {
             try {
               this.lastResponse = JSON.parse(responseStr);
               const responseBlobArray = responseMessage.getBlobs();
-              if (this.lastResponse) {
-                if (this.socket) {
-                  this.connectionPool.markBusy(poolKey, this.socket, false);
-                }
-                return [this.lastResponse, responseBlobArray];
+              if (this.socket) {
+                this.connectionPool.markBusy(poolKey, this.socket, false);
               }
+              return [this.lastResponse, responseBlobArray];
             } catch (e) {
               Logger.error('_query: Failed to parse response JSON:', e);
+              throw e;
             }
           }
         }
       }
 
-      throw new Error('Failed to get valid response from server');
+      throw new Error('No response received from server');
     } catch (error) {
       if (this.socket) {
         this.connectionPool.removeConnection(poolKey, this.socket);
@@ -938,24 +937,11 @@ export class BaseClient implements QueryExecutor {
 
   public async query<T = any>(q: any, blobs: Buffer[] = []): Promise<[T, Buffer[]]> {
     await this.ensureAuthenticated();
-
-    try {
-      const start = Date.now();
-      let [response, responseBlobs] = await this._query(q, blobs);
-
-      if (!Array.isArray(response) && response.info === 'Not Authenticated!') {
-        Logger.warn(`Session expired while query was sent. Retrying... ${JSON.stringify(this.config)}`);
-        await this._renewSession();
-        [response, responseBlobs] = await this._query(q, blobs);
-      }
-
-      this.lastQueryTime = (Date.now() - start) / 1000;
-      this.lastQueryTimestamp = Date.now();
-      return [response, responseBlobs];
-    } catch (error) {
-      Logger.error('Failed to query', error);
-      throw error;
-    }
+    const start = Date.now();
+    const [response, responseBlobs] = await this._query(q, blobs);
+    this.lastQueryTime = (Date.now() - start) / 1000;
+    this.lastQueryTimestamp = Date.now();
+    return [response, responseBlobs];
   }
 
   // Add cleanup method
