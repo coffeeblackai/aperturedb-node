@@ -19,33 +19,42 @@ export class Logger {
     Logger._level = level;
   }
 
+  private static log(level: string, message: string, args: any[]) {
+    const formattedArgs = args.map(arg => Logger.formatArg(arg));
+    if (args.length > 0) {
+      process.stdout.write(`[${level}] ${message} ${formattedArgs.join(' ')}\n`);
+    } else {
+      process.stdout.write(`[${level}] ${message}\n`);
+    }
+  }
+
   static trace(message: string, ...args: any[]) {
     if (Logger._level <= LogLevel.TRACE) {
-      console.trace(message, ...args.map(arg => Logger.formatArg(arg)));
+      Logger.log('TRACE', message, args);
     }
   }
 
   static debug(message: string, ...args: any[]) {
     if (Logger._level <= LogLevel.DEBUG) {
-      console.debug(message, ...args.map(arg => Logger.formatArg(arg)));
+      Logger.log('DEBUG', message, args);
     }
   }
 
   static info(message: string, ...args: any[]) {
     if (Logger._level <= LogLevel.INFO) {
-      console.info(message, ...args.map(arg => Logger.formatArg(arg)));
+      Logger.log('INFO', message, args);
     }
   }
 
   static warn(message: string, ...args: any[]) {
     if (Logger._level <= LogLevel.WARN) {
-      console.warn(message, ...args.map(arg => Logger.formatArg(arg)));
+      Logger.log('WARN', message, args);
     }
   }
 
   static error(message: string, ...args: any[]) {
     if (Logger._level <= LogLevel.ERROR) {
-      console.error(message, ...args.map(arg => Logger.formatArg(arg)));
+      Logger.log('ERROR', message, args);
     }
   }
 

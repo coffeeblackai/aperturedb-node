@@ -161,6 +161,34 @@ describe('Raw Query Operations', () => {
       expect(blobs[0].equals(originalVideoBuffer)).toBe(true);
     });
 
+    test('should find video by specific ID with blobs', async () => {
+      const query = [{
+        "FindVideo": {
+          "constraints": {
+            "id": ["==", "4a08e598-65b6-47cc-9270-18f3375f862d"]
+          },
+          "results": {
+            "all_properties": true
+          },
+          "blobs": true
+        }
+      }];
+
+      const [response, blobs] = await client.rawQuery(query);
+      expect(response).toBeDefined();
+      expect(Array.isArray(response)).toBe(true);
+      expect(response[0].FindVideo).toBeDefined();
+      expect(response[0].FindVideo.status).toBe(0);
+      
+      if (response[0].FindVideo.entities?.length > 0) {
+        const video = response[0].FindVideo.entities[0];
+        expect(video.id).toBe("4a08e598-65b6-47cc-9270-18f3375f862d");
+        expect(video._blob_index).toBeDefined();
+        expect(blobs[video._blob_index]).toBeDefined();
+        expect(Buffer.isBuffer(blobs[video._blob_index])).toBe(true);
+      }
+    });
+
     afterAll(async () => {
       if (testVideoId) {
         // Delete video using raw query
