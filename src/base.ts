@@ -909,17 +909,28 @@ export class BaseClient implements QueryExecutor {
   checkStatus(jsonRes: any): number {
     let status = -2;
     if (typeof jsonRes === 'object' && jsonRes !== null) {
-      if (!('status' in jsonRes)) {
-        const firstKey = Object.keys(jsonRes)[0];
-        status = this.checkStatus(jsonRes[firstKey]);
-      } else {
+      if ('status' in jsonRes) {
         status = jsonRes.status;
+      } else {
+        // Check first level
+        const firstKey = Object.keys(jsonRes)[0];
+        if (firstKey) {
+          const firstValue = jsonRes[firstKey];
+          if (typeof firstValue === 'object' && firstValue !== null) {
+            if ('status' in firstValue) {
+              status = firstValue.status;
+            }
+          }
+        }
       }
     } else if (Array.isArray(jsonRes)) {
-      if (!('status' in jsonRes[0])) {
-        status = this.checkStatus(jsonRes[0]);
-      } else {
-        status = jsonRes[0].status;
+      // For arrays, check each element until we find a valid status
+      for (const item of jsonRes) {
+        const itemStatus = this.checkStatus(item);
+        if (itemStatus !== -2) {
+          status = itemStatus;
+          break;
+        }
       }
     }
     return status;
