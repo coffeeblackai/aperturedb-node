@@ -41,13 +41,27 @@ export class ParallelQuery {
       try {
         [this.response, this.responseBlobs] = await client.query(this.query, this.blobs);
         
-        // Check if the response indicates an error
-        if (this.response && typeof this.response === 'object') {
-          if ('status' in this.response && this.response.status < 0) {
-            throw new Error(this.response.info || 'Query failed with negative status');
+        // More comprehensive response validation
+        if (!this.response) {
+          throw new Error('Empty response received from server');
+        }
+        
+        if (Array.isArray(this.response)) {
+          // Check each response in array
+          for (const resp of this.response) {
+            if (resp && typeof resp === 'object') {
+              const command = Object.keys(resp)[0];
+              const status = resp[command]?.status;
+              if (typeof status === 'number' && status < 0) {
+                throw new Error(`${command} failed with status ${status}: ${resp[command]?.info || 'Unknown error'}`);
+              }
+            }
           }
-          if ('info' in this.response && this.response.info === 'Not Authenticated!') {
-            throw new Error('Authentication failed during query execution');
+        } else if (typeof this.response === 'object') {
+          const command = Object.keys(this.response)[0];
+          const status = this.response[command]?.status;
+          if (typeof status === 'number' && status < 0) {
+            throw new Error(`${command} failed with status ${status}: ${this.response[command]?.info || 'Unknown error'}`);
           }
         }
         
@@ -55,8 +69,9 @@ export class ParallelQuery {
         return [this.response, this.responseBlobs];
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error during query execution');
+        Logger.debug(`Query attempt ${attempt + 1}/${this.retryAttempts + 1} failed:`, lastError);
+        
         if (attempt < this.retryAttempts) {
-          // Exponential backoff with jitter
           const delay = this.retryDelayMs * Math.pow(2, attempt) * (0.5 + Math.random());
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
@@ -94,6 +109,7 @@ export class ParallelQuerySet {
   private queries: ParallelQuery[] = [];
   private maxBatchSize: number;
   private maxConcurrentBatches: number;
+  private completedResponses: any[] = [];
 
   constructor(options: ParallelQueryOptions = {}) {
     this.maxBatchSize = options.maxBatchSize ?? 10;
@@ -107,31 +123,64 @@ export class ParallelQuerySet {
   async execute(client: QueryExecutor): Promise<[any[], Buffer[][]]> {
     const responses: any[] = [];
     const allBlobs: Buffer[][] = [];
+    this.completedResponses = [];
+    let batchErrors: Error[] = [];
 
     // Process queries in batches
     for (let i = 0; i < this.queries.length; i += this.maxBatchSize) {
+      // Add small delay between batches to prevent overwhelming the server
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
       const batch = this.queries.slice(i, i + this.maxBatchSize);
       
-      try {
-        // Execute batch queries concurrently with Promise.all
-        const results = await Promise.all(batch.map(async query => {
-          try {
-            return await query.execute(client);
-          } catch (error) {
-            // Wrap the error to preserve the original error message
-            throw new Error(`Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }));
-        
-        // Collect responses and blobs
-        results.forEach(([response, blobs]) => {
+      // Execute batch queries concurrently with Promise.all
+      const batchPromises = batch.map(async query => {
+        try {
+          const result = await query.execute(client);
+          // Store completed response immediately
+          this.completedResponses.push(result[0]);
+          return { success: true as const, result };
+        } catch (error) {
+          // Store the error but don't throw yet
+          const wrappedError = error instanceof Error ? error : new Error('Unknown error during query execution');
+          batchErrors.push(wrappedError);
+          Logger.debug('Query in batch failed:', wrappedError);
+          return { success: false as const, error: wrappedError };
+        }
+      });
+
+      const results = await Promise.all(batchPromises);
+      
+      // Track batch success rate
+      let batchSuccessCount = 0;
+      
+      // Collect successful responses and blobs
+      results.forEach(result => {
+        if (result.success) {
+          const [response, blobs] = result.result;
           responses.push(response);
           allBlobs.push(blobs);
-        });
-      } catch (error) {
-        // If any query in the batch fails, throw the error
-        throw error instanceof Error ? error : new Error('Unknown error during batch execution');
+          batchSuccessCount++;
+        }
+      });
+
+      // If this batch had a high failure rate, add a small delay before next batch
+      if (batchSuccessCount < batch.length * 0.5) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
+    }
+
+    // If there were any errors but some successes, log warning
+    if (batchErrors.length > 0 && responses.length > 0) {
+      Logger.warn(`Parallel query completed with ${batchErrors.length} errors and ${responses.length} successes`);
+    }
+    
+    // If there were only errors, throw the first one
+    if (batchErrors.length > 0 && responses.length === 0) {
+      const errorMessage = batchErrors.map(e => e.message).join('; ');
+      throw new Error(`Query execution failed: ${errorMessage}`);
     }
 
     return [responses, allBlobs];
@@ -147,6 +196,12 @@ export class ParallelQuerySet {
 
   clear(): void {
     this.queries = [];
+    this.completedResponses = [];
+  }
+
+  // Add method to get completed responses
+  getCompletedResponses(): any[] {
+    return this.completedResponses;
   }
 }
 

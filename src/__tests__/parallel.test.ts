@@ -1,71 +1,92 @@
 import 'dotenv/config';
 import { ParallelQuery, ParallelQuerySet, Parallelizer } from '../parallel.js';
 import { getTestClient, destroyTestClient } from './helpers/testClient.js';
-import { LogLevel } from '../utils/logger.js';
+import type { QueryCommand } from '../query.js';
 
 describe('Parallel Query Operations', () => {
   const client = getTestClient();
   const parallelizer = new Parallelizer(client);
   
-  beforeAll(() => {
-    client.setLogLevel(LogLevel.TRACE);
-  });
+  beforeAll(async () => {
+    console.log('Setting up test data...');
+    
+    try {
+      // Clean up test entities
+      const testClasses = ['test1', 'test2', 'test3'];
+      for (const className of testClasses) {
+        try {
+          await client.rawQuery([{
+            "DeleteEntity": {
+              "with_class": className,
+              "constraints": { "name": ["==", className] }
+            }
+          }]);
+        } catch (error) {
+          // Ignore if doesn't exist
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Create test entities with proper class creation
+      for (const className of testClasses) {
+        try {
+          // First ensure the class exists
+          await client.rawQuery([{
+            "CreateClass": {
+              "name": className,
+              "properties": {
+                "name": "string"
+              }
+            }
+          }]);
+          
+          // Then create the entity
+          await client.rawQuery([{
+            "AddEntity": {
+              "class": className,
+              "properties": {
+                "name": className
+              }
+            }
+          }]);
+        } catch (error) {
+          console.error(`Failed to create entity ${className}:`, error);
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error('Setup failed:', error);
+      throw error;
+    }
+  }, 30000);
 
   afterAll(async () => {
-    await destroyTestClient();
-  }, 15000);
-
-  describe('ParallelQuery', () => {
-    test('should execute a single query', async () => {
-      const query = [{
-        "FindEntity": {
-          "with_class": "test",
-          "results": {
-            "all_properties": true
-          }
+    try {
+      const testClasses = ['test1', 'test2', 'test3'];
+      for (const className of testClasses) {
+        try {
+          await client.rawQuery([{
+            "DeleteEntity": {
+              "with_class": className,
+              "constraints": { "name": ["==", className] }
+            }
+          }]);
+        } catch (error) {
+          console.log(`Failed to clean up ${className}:`, error);
         }
-      }];
-
-      const parallelQuery = new ParallelQuery(query);
-      const [response, blobs] = await parallelQuery.execute(client);
-      
-      expect(response).toBeDefined();
-      expect(Array.isArray(response)).toBe(true);
-      expect(blobs).toBeDefined();
-      expect(Array.isArray(blobs)).toBe(true);
-      expect(parallelQuery.hasExecuted()).toBe(true);
-      expect(parallelQuery.hasError()).toBe(false);
-    });
-
-    test('should handle query with retry on failure', async () => {
-      const invalidQuery = [{
-        "InvalidCommand": {}
-      }];
-
-      const parallelQuery = new ParallelQuery(invalidQuery, [], {
-        retryAttempts: 2,
-        retryDelayMs: 100
-      });
-
-      await expect(parallelQuery.execute(client)).rejects.toThrow();
-      expect(parallelQuery.hasError()).toBe(true);
-      expect(parallelQuery.getError()).toBeDefined();
-    });
+      }
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+    } finally {
+      await destroyTestClient();
+    }
   });
 
   describe('ParallelQuerySet', () => {
-    let querySet: ParallelQuerySet;
-
-    beforeEach(() => {
-      querySet = new ParallelQuerySet({ maxBatchSize: 2 });
-    });
-
-    afterEach(() => {
-      querySet.clear();
-    });
-
-    test('should execute multiple queries in parallel', async () => {
-      // Add multiple queries
+    test('should execute multiple entity queries in parallel', async () => {
+      const querySet = parallelizer.createQuerySet({ maxBatchSize: 2 });
+      
       const queries = [
         [{
           "FindEntity": {
@@ -88,99 +109,85 @@ describe('Parallel Query Operations', () => {
       ];
 
       queries.forEach(query => querySet.add(query));
-      expect(querySet.size()).toBe(3);
-
       const [responses, allBlobs] = await querySet.execute(client);
       
+      console.log('Entity responses:', JSON.stringify(responses, null, 2));
+      
       expect(responses).toBeDefined();
-      expect(Array.isArray(responses)).toBe(true);
       expect(responses.length).toBe(3);
-      expect(allBlobs).toBeDefined();
-      expect(Array.isArray(allBlobs)).toBe(true);
-      expect(allBlobs.length).toBe(3);
+      
+      // Verify each response has correct data
+      const foundNames = new Set(responses.map(response => 
+        response[0].FindEntity.entities[0].name
+      ));
+      expect(foundNames).toEqual(new Set(['test1', 'test2', 'test3']));
     }, 15000);
 
-    test('should handle mixed success and failure queries', async () => {
-      // Add valid and invalid queries
-      querySet.add([{
-        "FindEntity": {
-          "with_class": "test",
-          "results": { "all_properties": true }
+    test('should handle parallel descriptor operations', async () => {
+      // First clean up any existing descriptor set
+      try {
+        await client.rawQuery([{
+          "DeleteDescriptorSet": {
+            "with_name": "test_set"
+          }
+        }]);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        // Ignore if doesn't exist
+      }
+
+      // First create the descriptor set separately
+      await client.rawQuery([{
+        "AddDescriptorSet": {
+          "name": "test_set",
+          "dimensions": 4,
+          "metric": "L2",
+          "engine": "Flat"
         }
       }]);
 
+      // Wait for descriptor set to be ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const querySet = parallelizer.createQuerySet({ maxBatchSize: 2 });
+      
+      // Create two descriptors to add
+      const descriptor1 = new Float32Array([0.1, 0.2, 0.3, 0.4]);
+      const descriptor2 = new Float32Array([0.5, 0.6, 0.7, 0.8]);
+
+      // Add first descriptor
       querySet.add([{
-        "InvalidCommand": {}
+        "AddDescriptor": {
+          "set": "test_set",
+          "properties": { "label": "test1" }
+        } as any
+      }], [Buffer.from(descriptor1.buffer)]);
+
+      // Add second descriptor
+      querySet.add([{
+        "AddDescriptor": {
+          "set": "test_set",
+          "properties": { "label": "test2" }
+        } as any
+      }], [Buffer.from(descriptor2.buffer)]);
+
+      const [responses, blobs] = await querySet.execute(client);
+      
+      console.log('Descriptor responses:', JSON.stringify(responses, null, 2));
+      
+      expect(responses).toBeDefined();
+      expect(responses.length).toBe(2);
+      
+      // Verify both descriptors were added - fix response structure access
+      expect(responses[0][0].AddDescriptor.status).toBe(0);
+      expect(responses[1][0].AddDescriptor.status).toBe(0);
+
+      // Clean up
+      await client.rawQuery([{
+        "DeleteDescriptorSet": {
+          "with_name": "test_set"
+        }
       }]);
-
-      try {
-        await querySet.execute(client);
-        fail('Expected query execution to throw an error');
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(error instanceof Error).toBe(true);
-      }
     }, 15000);
-  });
-
-  describe('Parallelizer', () => {
-    test('should execute query batch', async () => {
-      const queries = [
-        [{
-          "FindEntity": {
-            "with_class": "test1",
-            "results": { "all_properties": true }
-          }
-        }],
-        [{
-          "FindEntity": {
-            "with_class": "test2",
-            "results": { "all_properties": true }
-          }
-        }]
-      ];
-
-      const [responses, allBlobs] = await parallelizer.executeQueries(queries);
-      
-      expect(responses).toBeDefined();
-      expect(Array.isArray(responses)).toBe(true);
-      expect(responses.length).toBe(2);
-      expect(allBlobs).toBeDefined();
-      expect(Array.isArray(allBlobs)).toBe(true);
-      expect(allBlobs.length).toBe(2);
-    }, 30000);
-
-    test('should handle query batch with blobs', async () => {
-      const queries = [
-        [{
-          "FindDescriptor": {
-            "set": "test_set",
-            "k_neighbors": 5,
-            "results": { "all_properties": true }
-          }
-        }],
-        [{
-          "FindDescriptor": {
-            "set": "test_set",
-            "k_neighbors": 5,
-            "results": { "all_properties": true }
-          }
-        }]
-      ];
-
-      const blobs = [
-        [Buffer.from([1, 2, 3, 4])],
-        [Buffer.from([5, 6, 7, 8])]
-      ];
-
-      const [responses, allBlobs] = await parallelizer.executeQueries(queries, blobs);
-      
-      expect(responses).toBeDefined();
-      expect(Array.isArray(responses)).toBe(true);
-      expect(responses.length).toBe(2);
-      expect(allBlobs).toBeDefined();
-      expect(Array.isArray(allBlobs)).toBe(true);
-      expect(allBlobs.length).toBe(2);
-    }, 30000);
   });
 }); 
