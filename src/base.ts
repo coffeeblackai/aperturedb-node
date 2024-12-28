@@ -5,6 +5,7 @@ import AsyncLock from 'async-lock';
 import { ApertureConfig } from './types.js';
 import { QueryMessage } from './proto/queryMessage.js';
 import { Logger, LogLevel } from './utils/logger.js';
+import { QueryExecutor } from './parallel.js';
 
 const PROTOCOL_VERSION = 1;
 
@@ -43,7 +44,117 @@ interface SharedData {
   lock: any; // Using any since Node.js doesn't have a direct mutex equivalent
 }
 
-export class BaseClient {
+// Add connection pool management
+interface PooledSocket {
+  socket: Socket | TLSSocket;
+  lastUsed: number;
+  busy: boolean;
+}
+
+class ConnectionPool {
+  private static instance: ConnectionPool;
+  private pool: Map<string, PooledSocket[]> = new Map();
+  private maxPoolSize: number = 5;
+  private maxIdleTime: number = 60000; // 60 seconds
+  private cleanupInterval: NodeJS.Timeout;
+
+  private constructor() {
+    // Create cleanup interval and unref it so it doesn't keep the process alive
+    this.cleanupInterval = setInterval(() => this.cleanup(), 30000).unref();
+  }
+
+  static getInstance(): ConnectionPool {
+    if (!ConnectionPool.instance) {
+      ConnectionPool.instance = new ConnectionPool();
+    }
+    return ConnectionPool.instance;
+  }
+
+  getConnection(key: string): PooledSocket | undefined {
+    const connections = this.pool.get(key) || [];
+    return connections.find(conn => !conn.busy);
+  }
+
+  addConnection(key: string, socket: Socket | TLSSocket): void {
+    const connections = this.pool.get(key) || [];
+    if (connections.length < this.maxPoolSize) {
+      connections.push({
+        socket,
+        lastUsed: Date.now(),
+        busy: false
+      });
+      this.pool.set(key, connections);
+    }
+  }
+
+  markBusy(key: string, socket: Socket | TLSSocket, busy: boolean): void {
+    const connections = this.pool.get(key) || [];
+    const connection = connections.find(conn => conn.socket === socket);
+    if (connection) {
+      connection.busy = busy;
+      connection.lastUsed = Date.now();
+    }
+  }
+
+  removeConnection(key: string, socket: Socket | TLSSocket): void {
+    const connections = this.pool.get(key) || [];
+    const index = connections.findIndex(conn => conn.socket === socket);
+    if (index !== -1) {
+      connections.splice(index, 1);
+      if (connections.length === 0) {
+        this.pool.delete(key);
+      } else {
+        this.pool.set(key, connections);
+      }
+    }
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, connections] of this.pool.entries()) {
+      const activeConnections = connections.filter(conn => {
+        const idle = now - conn.lastUsed > this.maxIdleTime;
+        if (idle && !conn.busy) {
+          conn.socket.destroy();
+          return false;
+        }
+        return true;
+      });
+      if (activeConnections.length === 0) {
+        this.pool.delete(key);
+      } else {
+        this.pool.set(key, activeConnections);
+      }
+    }
+  }
+
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null as any;
+    }
+    for (const connections of this.pool.values()) {
+      connections.forEach(conn => {
+        try {
+          conn.socket.end();
+          conn.socket.destroy();
+        } catch (err) {
+          // Ignore errors during cleanup
+        }
+      });
+    }
+    this.pool.clear();
+  }
+
+  static destroyInstance(): void {
+    if (ConnectionPool.instance) {
+      ConnectionPool.instance.destroy();
+      ConnectionPool.instance = null as any;
+    }
+  }
+}
+
+export class BaseClient implements QueryExecutor {
   protected config: ApertureConfig;
   protected socket: Socket | TLSSocket | null = null;
   protected connected: boolean = false;
@@ -54,13 +165,9 @@ export class BaseClient {
   protected sharedData: SharedData;
   protected shouldAuthenticate: boolean;
   protected everConnected: boolean = false;
-  protected queryConnectionErrorSuppressionDelta: number = 30000; // 30 seconds in ms
-
-  // Helper function to truncate buffer content
-  protected truncateBuffer(buf: Buffer, maxLen: number = 10): string {
-    const preview = buf.toString('hex', 0, Math.min(maxLen, buf.length));
-    return buf.length > maxLen ? `${preview}... (${buf.length} bytes)` : preview;
-  }
+  protected queryConnectionErrorSuppressionDelta: number = 30000;
+  protected connectionPool: ConnectionPool;
+  protected messageCache: Map<string, Buffer> = new Map();
 
   constructor(config?: Partial<ApertureConfig>) {
     // Validate required config values
@@ -96,6 +203,7 @@ export class BaseClient {
 
     // Don't set shouldAuthenticate yet - wait for connect
     this.shouldAuthenticate = false;
+    this.connectionPool = ConnectionPool.getInstance();
   }
 
   /**
@@ -136,24 +244,28 @@ export class BaseClient {
   }
 
   protected async _connect(): Promise<void> {
-    const CONNECT_TIMEOUT = 15000; // 15 seconds for cloud connections
-
-    if (!this.config.host) {
-      throw new Error('Host is required for connection');
-    }
-
+    const CONNECT_TIMEOUT = 15000;
+    const poolKey = `${this.config.host}:${this.config.port}`;
+    
     try {
-      // First establish TCP connection
+      // Check connection pool first
+      const pooledSocket = this.connectionPool.getConnection(poolKey);
+      if (pooledSocket) {
+        this.socket = pooledSocket.socket;
+        this.connectionPool.markBusy(poolKey, this.socket, true);
+        this.connected = true;
+        Logger.debug('Reusing pooled connection');
+        return;
+      }
+
+      // Create new connection if none available in pool
       this.socket = new Socket();
       this.socket.setNoDelay(true);
       
-      Logger.debug('Connecting to:', this.config.host, 'port:', this.config.port);
-
       if (this.config.useKeepalive) {
         this.socket.setKeepAlive(true, 1000);
       }
 
-      // Connect TCP socket with more detailed error handling
       await new Promise<void>((resolve, reject) => {
         if (!this.socket) return reject(new Error('Socket not initialized'));
         
@@ -279,8 +391,13 @@ export class BaseClient {
 
       this.connected = true;
       Logger.debug(`Successfully connected to ${this.config.host}:${this.config.port} using ${this.config.useSsl ? 'SSL' : 'plain TCP'}`);
+
+      // Add new connection to pool
+      this.connectionPool.addConnection(poolKey, this.socket);
+      this.connectionPool.markBusy(poolKey, this.socket, true);
     } catch (error) {
       if (this.socket) {
+        this.connectionPool.removeConnection(poolKey, this.socket);
         this.socket.destroy();
         this.socket = null;
       }
@@ -633,98 +750,64 @@ export class BaseClient {
   }
 
   protected async _query(query: any[], blobArray: Buffer[] = [], tryResume: boolean = true): Promise<[any, Buffer[]]> {
-    let responseBlobArray: Buffer[] = [];
+    const poolKey = `${this.config.host}:${this.config.port}`;
     
-    // Convert query to protobuf message
-    const queryStr = typeof query === 'string' ? query : JSON.stringify(query);
-    Logger.trace('_query: Sending query:', queryStr);
-    
-    const queryMessage = new QueryMessage(queryStr, blobArray);
-
-    // Add session token if we have one
-    if (this.sharedData.session?.sessionToken) {
-      queryMessage.setToken(this.sharedData.session.sessionToken);
-      Logger.trace('_query: Added session token to query');
-    }
-    
-    const queryBuffer = queryMessage.toBuffer();
-
     try {
-      // Ensure we're connected before sending
+      // Ensure connection
       if (!this.connected || !this.socket?.writable) {
-        Logger.debug('_query: Socket not connected or not writable, reconnecting...');
-        if (this.socket) {
-          this.socket.destroy();
-          this.socket = null;
-        }
-        this.connected = false;
         await this.connect("Reconnecting before query attempt");
-        
-        // After reconnect, we need to re-authenticate
         if (!this.authenticated || this.shouldAuthenticate) {
           await this.ensureAuthenticated();
         }
       }
 
-      Logger.trace('_query: Sending message...');
-      const sendResult = await this._sendMsg(queryBuffer);
-      Logger.trace('_query: Send result:', sendResult);
+      // Cache message if possible
+      const queryStr = typeof query === 'string' ? query : JSON.stringify(query);
+      const cacheKey = `${queryStr}-${this.sharedData.session?.sessionToken || ''}`;
+      let queryBuffer = this.messageCache.get(cacheKey);
 
+      if (!queryBuffer) {
+        const queryMessage = new QueryMessage(queryStr, blobArray);
+        if (this.sharedData.session?.sessionToken) {
+          queryMessage.setToken(this.sharedData.session.sessionToken);
+        }
+        queryBuffer = queryMessage.toBuffer();
+        this.messageCache.set(cacheKey, queryBuffer);
+      }
+
+      const sendResult = await this._sendMsg(queryBuffer);
+      
       if (sendResult) {
-        Logger.trace('_query: Waiting for response...');
         const response = await this._recvMsg();
-        Logger.trace('_query: Received response:', response?.length ?? 0, 'bytes');
-        
         if (response) {
-          // Parse response using protobuf
-          Logger.trace('_query: Parsing protobuf response...');
           const responseMessage = QueryMessage.fromBuffer(response);
           const responseStr = responseMessage.getJson();
-          Logger.trace('_query: Parsed response:', {
-            message: responseStr,
-            blobs: responseMessage.getBlobs().map(blob => `${blob.length} bytes`),
-            blobCount: responseMessage.getBlobs().length,
-            totalBlobBytes: responseMessage.getBlobs().reduce((acc, blob) => acc + blob.length, 0)
-          });
           
           if (responseStr) {
             try {
               this.lastResponse = JSON.parse(responseStr);
-              responseBlobArray = responseMessage.getBlobs();
+              const responseBlobArray = responseMessage.getBlobs();
               if (this.lastResponse) {
-                Logger.debug('Query completed successfully');
+                if (this.socket) {
+                  this.connectionPool.markBusy(poolKey, this.socket, false);
+                }
                 return [this.lastResponse, responseBlobArray];
               }
             } catch (e) {
               Logger.error('_query: Failed to parse response JSON:', e);
             }
-          } else {
-            Logger.error('_query: Response message had no JSON content');
           }
-        } else {
-          Logger.error('_query: Received null response from _recvMsg');
         }
-      } else {
-        Logger.error('_query: Failed to send message');
       }
 
       throw new Error('Failed to get valid response from server');
     } catch (error) {
-      // Handle connection cleanup
       if (this.socket) {
+        this.connectionPool.removeConnection(poolKey, this.socket);
         this.socket.destroy();
         this.socket = null;
       }
       this.connected = false;
-
-      if (error instanceof Error) {
-        Logger.error('_query: Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-      }
-
       throw error;
     }
   }
@@ -862,5 +945,52 @@ export class BaseClient {
       Logger.error('Failed to query', error);
       throw error;
     }
+  }
+
+  // Add cleanup method
+  public async destroy(): Promise<void> {
+    // Wait for any pending operations to complete
+    await this.sharedData.lock.acquire('session', async () => {
+      if (this.socket) {
+        const poolKey = `${this.config.host}:${this.config.port}`;
+        this.connectionPool.removeConnection(poolKey, this.socket);
+        
+        // Properly close the socket
+        await new Promise<void>((resolve) => {
+          if (!this.socket) {
+            resolve();
+            return;
+          }
+
+          const cleanup = () => {
+            this.socket?.removeListener('close', onClose);
+            this.socket?.removeListener('error', onError);
+            resolve();
+          };
+
+          const onClose = () => cleanup();
+          const onError = () => cleanup();
+
+          this.socket.once('close', onClose);
+          this.socket.once('error', onError);
+
+          try {
+            this.socket.end(() => {
+              this.socket?.destroy();
+              cleanup();
+            });
+          } catch (err) {
+            cleanup();
+          }
+        });
+
+        this.socket = null;
+      }
+
+      this.connected = false;
+      this.authenticated = false;
+      this.messageCache.clear();
+      this.sharedData.session = null;
+    });
   }
 } 

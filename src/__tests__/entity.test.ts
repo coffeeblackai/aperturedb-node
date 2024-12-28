@@ -20,6 +20,13 @@ describe('Entity Operations', () => {
     client = ApertureClient.getInstance(config);
   });
 
+  afterAll(async () => {
+    // Ensure proper cleanup of client and connections
+    if (client) {
+      await client.destroy();
+    }
+  });
+
   describe('Entity CRUD operations', () => {
     const testEntity = {
       name: 'test-dataset',

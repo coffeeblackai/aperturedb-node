@@ -1,6 +1,8 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client.js';
+import { ApertureClient } from '../index.js';
 import type { ApertureConfig } from '../types.js';
+import fs from 'fs';
+import { LogLevel } from '../utils/logger.js';
 
 describe('Raw Query Operations', () => {
   let client: ApertureClient;
@@ -18,6 +20,7 @@ describe('Raw Query Operations', () => {
     };
 
     client = ApertureClient.getInstance(config);
+    client.setLogLevel(LogLevel.TRACE);
   });
 
   describe('Basic Query Operations', () => {
@@ -84,6 +87,99 @@ describe('Raw Query Operations', () => {
   });
 
   describe('Binary Blob Handling', () => {
+    const testVideoPath = 'testdata/test.mp4';
+    const testVideoProperties = {
+      name: 'test-video-raw-query',
+      description: 'A test video for raw query',
+      fps: 30,
+      duration: 10000000 // 10 seconds in microseconds
+    };
+
+    let testVideoId: string;
+    let originalVideoBuffer: Buffer;
+
+    beforeAll(async () => {
+      // Ensure test video exists
+      expect(fs.existsSync(testVideoPath)).toBeTruthy();
+      originalVideoBuffer = fs.readFileSync(testVideoPath);
+
+      // Create test video using raw query
+      const createQuery = [{
+        "AddVideo": {
+          "properties": testVideoProperties,
+          "_ref": 1
+        }
+      }];
+
+      const [createResponse] = await client.rawQuery(createQuery, [originalVideoBuffer]);
+      expect(createResponse[0].AddVideo.status).toBe(0);
+      
+      // Get video ID using raw query
+      const findQuery = [{
+        "FindVideo": {
+          "constraints": { 
+            "name": ["==", testVideoProperties.name]
+          },
+          "results": {
+            "all_properties": true
+          }
+        }
+      }];
+
+      const [findResponse] = await client.rawQuery(findQuery);
+      expect(findResponse[0].FindVideo.entities.length).toBe(1);
+      testVideoId = findResponse[0].FindVideo.entities[0]._uniqueid;
+    });
+
+    test('should handle video query with blob', async () => {
+      const query = [{
+        "FindVideo": {
+          "constraints": { 
+            "_uniqueid": ["==", testVideoId]
+          },
+          "blobs": true,
+          "results": {
+            "all_properties": true
+          }
+        }
+      }];
+
+      const [response, blobs] = await client.rawQuery(query);
+      expect(response).toBeDefined();
+      expect(Array.isArray(response)).toBe(true);
+      expect(response[0].FindVideo.entities).toBeDefined();
+      expect(response[0].FindVideo.entities.length).toBe(1);
+      
+      const video = response[0].FindVideo.entities[0];
+      expect(video.name).toBe(testVideoProperties.name);
+      expect(video.description).toBe(testVideoProperties.description);
+      
+      expect(blobs).toBeDefined();
+      expect(Array.isArray(blobs)).toBe(true);
+      expect(blobs.length).toBe(1);
+      expect(Buffer.isBuffer(blobs[0])).toBe(true);
+      expect(blobs[0].equals(originalVideoBuffer)).toBe(true);
+    });
+
+    afterAll(async () => {
+      if (testVideoId) {
+        // Delete video using raw query
+        const deleteQuery = [{
+          "DeleteVideo": {
+            "constraints": {
+              "_uniqueid": ["==", testVideoId]
+            }
+          }
+        }];
+        
+        try {
+          await client.rawQuery(deleteQuery);
+        } catch (error) {
+          // Ignore errors during cleanup
+        }
+      }
+    });
+
     test('should handle query with binary blob', async () => {
       const blob = Buffer.from([1, 2, 3, 4]);
       const query = [{

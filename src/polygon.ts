@@ -10,7 +10,7 @@ export class PolygonClient {
   }
 
   private isChainedAddPolygonResponse(response: unknown): response is [
-    { FindImage: { returned: number; status: number } },
+    { FindImage: { returned: number; status: number; entities: Array<{ _uniqueid: string }> } },
     { AddPolygon: { status: number; _uniqueid?: string } }
   ] {
     if (!Array.isArray(response)) {
@@ -46,24 +46,20 @@ export class PolygonClient {
       throw new Error('Invalid AddPolygon format');
     }
     
-    if (!('status' in findImage) || !('entities' in findImage)) {
-      Logger.error('FindImage missing required properties:', findImage);
-      throw new Error('Invalid FindImage format');
-    }
+    // if (!Array.isArray(findImage.entities) || findImage.entities.length === 0) {
+    //   Logger.error('FindImage entities is not an array or is empty:', findImage.entities);
+    //   throw new Error('No matching image found');
+    // }
     
-    if (!('status' in addPolygon)) {
-      Logger.error('AddPolygon missing required properties:', addPolygon);
-      throw new Error('Invalid AddPolygon format');
-    }
 
     return true;
   }
 
-  async addPolygon(input: Omit<CreatePolygonInput, 'image_ref'> & { imageId: string }): Promise<PolygonMetadata> {
+  async addPolygon(input: Omit<CreatePolygonInput, 'image_ref'> & { constraints: Record<string, any> }): Promise<PolygonMetadata> {
     await this.baseClient.ensureAuthenticated();
     
-    if (!input.imageId) {
-      throw new Error('imageId is required for addPolygon');
+    if (!input.constraints || Object.keys(input.constraints).length === 0) {
+      throw new Error('constraints are required for addPolygon');
     }
 
     if (!input.points || !input.points.length) {
@@ -75,9 +71,7 @@ export class PolygonClient {
         "_ref": 1,
         "unique": true,
         "blobs": false,
-        "constraints": {
-          "_uniqueid": ["==", input.imageId]
-        }
+        "constraints": input.constraints
       }
     }, {
       "AddPolygon": {
@@ -97,7 +91,6 @@ export class PolygonClient {
     }
 
     return {
-      image_ref: input.imageId,
       points: input.points,
       properties: input.properties || {},
       created_at: new Date().toISOString(),

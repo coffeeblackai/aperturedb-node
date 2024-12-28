@@ -24,6 +24,13 @@ describe('Video Operations', () => {
     client.setLogLevel(LogLevel.INFO);
   });
 
+  afterAll(async () => {
+    // Ensure proper cleanup of client and connections
+    if (client) {
+      await client.destroy();
+    }
+  });
+
   describe('Video CRUD operations', () => {
     const testVideoPath = 'testdata/test.mp4';
     const testVideoProperties = {
@@ -87,7 +94,8 @@ describe('Video Operations', () => {
         blob: videoBuffer,
         properties: {
           ...testVideoProperties,
-          name: 'test-video-blob'
+          name: 'test-video-blob-2',
+          description: 'A second test video'
         }
       });
     });

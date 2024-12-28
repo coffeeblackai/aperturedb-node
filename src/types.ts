@@ -10,6 +10,7 @@ import type { ClipClient } from './clip.js';
 import type { EntityClient } from './entity.js';
 import type { ConnectionClient } from './connection.js';
 import type { LogLevel } from './utils/logger.js';
+import type { BaseClient } from './base.js';
 
 // Core types
 export interface ApertureConfig {
@@ -38,6 +39,12 @@ export interface ApertureClient {
   readonly entities: EntityClient;
   readonly connections: ConnectionClient;
   setLogLevel(level: LogLevel): void;
+  rawQuery<T = any>(query: any, blobs?: Buffer[]): Promise<[T, Buffer[]]>;
+}
+
+export interface ApertureClientConstructor {
+  getInstance(config?: Partial<ApertureConfig>): ApertureClient;
+  _reset(): void;
 }
 
 export interface AuthResponse {
@@ -253,12 +260,13 @@ export interface FrameMetadata {
 }
 
 export interface CreateFrameInput {
-  video_ref: string;
+  video_ref?: string;
   frame_number?: number;
   time_offset?: string;
   time_fraction?: number;
   properties?: Record<string, any>;
   label?: string;
+  constraints?: Record<string, [string, any]>;
 }
 
 export interface UpdateFrameInput {
@@ -390,7 +398,7 @@ export interface CreatePolygonInput {
 export interface FindPolygonOptions {
   constraints?: Record<string, any>;
   results?: Record<string, any>;
-  uniqueids?: string[];
+  uniqueids?: boolean;
 }
 
 export interface DeletePolygonOptions {

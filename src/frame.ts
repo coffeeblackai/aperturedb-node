@@ -55,15 +55,6 @@ export class FrameClient {
       throw new Error('Invalid AddFrame format');
     }
     
-    if (!('status' in findVideo) || !('entities' in findVideo)) {
-      Logger.error('FindVideo missing required properties:', findVideo);
-      throw new Error('Invalid FindVideo format');
-    }
-    
-    if (!('status' in addFrame)) {
-      Logger.error('AddFrame missing status:', addFrame);
-      throw new Error('Invalid AddFrame format');
-    }
 
     return true;
   }
@@ -99,8 +90,8 @@ export class FrameClient {
   async addFrame(input: CreateFrameInput): Promise<FrameMetadata> {
     await this.baseClient.ensureAuthenticated();
     
-    if (!input.video_ref) {
-      throw new Error('video_ref is required for addFrame');
+    if (!input.video_ref && !input.constraints) {
+      throw new Error('Either video_ref or constraints must be provided');
     }
 
     // Validate that at least one position parameter is provided
@@ -113,9 +104,7 @@ export class FrameClient {
         "_ref": 1,
         "unique": true,
         "blobs": false,
-        "constraints": {
-          "_uniqueid": ["==", input.video_ref]
-        }
+        "constraints": input.constraints 
       }
     }, {
       "AddFrame": {
@@ -138,7 +127,7 @@ export class FrameClient {
     }
 
     return {
-      video_ref: input.video_ref,
+      video_ref: input.video_ref || '',
       frame_number: input.frame_number,
       time_offset: input.time_offset,
       time_fraction: input.time_fraction,

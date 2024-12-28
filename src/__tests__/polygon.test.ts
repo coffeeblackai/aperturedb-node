@@ -89,7 +89,7 @@ describe('Polygon Operations', () => {
         ];
 
         const polygon = await client.polygons.addPolygon({
-          imageId: testImage._uniqueid,
+          constraints: { _uniqueid: ["==", testImage._uniqueid] },
           points,
           properties: testPolygonProperties
         });
@@ -101,7 +101,8 @@ describe('Polygon Operations', () => {
         const foundPolygons = await client.polygons.findPolygons({
           constraints: {
             'name': ['==', testPolygonProperties.name]
-          }
+          },
+          uniqueids: true
         });
         expect(foundPolygons.length).toBe(1);
         if (!foundPolygons[0]._uniqueid) {
@@ -113,7 +114,7 @@ describe('Polygon Operations', () => {
 
       test('should fail to create a polygon without points', async () => {
         await expect(client.polygons.addPolygon({
-          imageId: testImage._uniqueid,
+          constraints: { _uniqueid: ["==", testImage._uniqueid] },
           points: [],
           properties: testPolygonProperties
         })).rejects.toThrow('points are required for addPolygon');
@@ -128,10 +129,10 @@ describe('Polygon Operations', () => {
         ];
 
         await expect(client.polygons.addPolygon({
-          imageId: '',
+          constraints: {},
           points,
           properties: testPolygonProperties
-        })).rejects.toThrow('imageId is required for addPolygon');
+        })).rejects.toThrow('constraints are required for addPolygon');
       });
 
       test('should fail to create a polygon with invalid image reference', async () => {
@@ -143,7 +144,7 @@ describe('Polygon Operations', () => {
         ];
 
         await expect(client.polygons.addPolygon({
-          imageId: 'invalid-image-ref',
+          constraints: { _uniqueid: ["==", 'invalid-image-ref'] },
           points,
           properties: testPolygonProperties
         })).rejects.toThrow();
@@ -158,7 +159,8 @@ describe('Polygon Operations', () => {
         const polygons = await client.polygons.findPolygons({ 
           constraints: { 
             'name': ['==', testPolygonProperties.name] 
-          }
+          },
+          uniqueids: true
         });
         expect(polygons.length).toBe(1);
         const polygon = polygons[0];
@@ -221,7 +223,7 @@ describe('Polygon Operations', () => {
 
         // Create two polygons
         const polygon1 = await client.polygons.addPolygon({
-          imageId: testImage._uniqueid,
+          constraints: { _uniqueid: ["==", testImage._uniqueid] },
           points: polygon1Points,
           properties: {
             name: 'multi-test-1',
@@ -230,7 +232,7 @@ describe('Polygon Operations', () => {
         });
 
         const polygon2 = await client.polygons.addPolygon({
-          imageId: testImage._uniqueid,
+          constraints: { _uniqueid: ["==", testImage._uniqueid] },
           points: polygon2Points,
           properties: {
             name: 'multi-test-2',

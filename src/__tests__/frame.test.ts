@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { ApertureClient } from '../client.js';
+import { ApertureClient } from '../index.js';
 import type { FrameMetadata, VideoMetadata, ApertureConfig } from '../types.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,6 +20,13 @@ describe('Frame Operations', () => {
     };
 
     client = ApertureClient.getInstance(config);
+  });
+
+  afterAll(async () => {
+    // Ensure proper cleanup of client and connections
+    if (client) {
+      await client.destroy();
+    }
   });
 
   describe('Frame CRUD operations', () => {
@@ -58,9 +65,10 @@ describe('Frame Operations', () => {
       });
 
       // Find the video to get its reference
-      const [video] = await client.videos.findVideos({ 
+      const videos = await client.videos.findVideos({ 
         constraints: { name: ['==', testVideoProperties.name] }
       });
+      const video = videos[0];
       expect(video).toBeDefined();
       expect(video._uniqueid).toBeDefined();
       testVideoId = video._uniqueid!;
@@ -75,11 +83,44 @@ describe('Frame Operations', () => {
         };
 
         const frame = await client.frames.addFrame({
-          video_ref: testVideoId,
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
           frame_number: 30, // 1 second at 30fps
           properties: frameProperties
         });
 
+        expect(frame).toBeDefined();
+        expect(frame.frame_number).toBe(30);
+        expect(frame.label).toBe(frameProperties.label);
+        expect(frame.description).toBe(frameProperties.description);
+        expect(frame.scene).toBe(frameProperties.scene);
+        expect(frame.created_at).toBeDefined();
+        expect(frame.updated_at).toBeDefined();
+      });
+
+      test('should create a frame using custom video constraints', async () => {
+        const frameProperties = {
+          label: 'test-frame-by-constraints',
+          description: 'A test frame using video name constraint',
+          scene: 'custom constraint test'
+        };
+
+        const frame = await client.frames.addFrame({
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
+          frame_number: 45, // 1.5 seconds at 30fps
+          properties: frameProperties,
+        });
+
+        expect(frame).toBeDefined();
+        expect(frame.frame_number).toBe(45);
+        expect(frame.label).toBe(frameProperties.label);
+        expect(frame.description).toBe(frameProperties.description);
+        expect(frame.scene).toBe(frameProperties.scene);
+        expect(frame.created_at).toBeDefined();
+        expect(frame.updated_at).toBeDefined();
       });
 
       test('should create a frame using time_offset', async () => {
@@ -90,13 +131,14 @@ describe('Frame Operations', () => {
         };
 
         const frame = await client.frames.addFrame({
-          video_ref: testVideoId,
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
           time_offset: '00:00:01.000', // 1 second into video
           properties: frameProperties
         });
 
         expect(frame).toBeDefined();
-        expect(frame.video_ref).toBe(testVideoId);
         expect(frame.time_offset).toBe('00:00:01.000');
         expect(frame.label).toBe(frameProperties.label);
         expect(frame.description).toBe(frameProperties.description);
@@ -113,13 +155,14 @@ describe('Frame Operations', () => {
         };
 
         const frame = await client.frames.addFrame({
-          video_ref: testVideoId,
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
           time_fraction: 0.5, // Middle of the video
           properties: frameProperties
         });
 
         expect(frame).toBeDefined();
-        expect(frame.video_ref).toBe(testVideoId);
         expect(frame.time_fraction).toBe(0.5);
         expect(frame.label).toBe(frameProperties.label);
         expect(frame.description).toBe(frameProperties.description);
@@ -135,20 +178,25 @@ describe('Frame Operations', () => {
         };
 
         await expect(client.frames.addFrame({
-          video_ref: testVideoId,
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
           properties: frameProperties
         })).rejects.toThrow('One of frame_number, time_offset, or time_fraction must be provided');
       });
 
       test('should fail to create a frame with invalid video reference', async () => {
         await expect(client.frames.addFrame({
-          video_ref: "invalid-video-ref", // Invalid video reference
+          constraints: {
+            _uniqueid: ['==', "invalid-video-ref"]
+          },
           frame_number: 30,
           properties: {
             label: 'test-frame-invalid'
           }
         })).rejects.toThrow();
       });
+
     });
 
     describe('Frame retrieval', () => {
@@ -157,7 +205,9 @@ describe('Frame Operations', () => {
       beforeAll(async () => {
         // Create a test frame for retrieval tests
         const frame = await client.frames.addFrame({
-          video_ref: testVideoId,
+          constraints: {
+            _uniqueid: ['==', testVideoId]
+          },
           frame_number: 30,
           label: 'test-frame-for-retrieval',
           properties: {
