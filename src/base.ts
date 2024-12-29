@@ -338,21 +338,48 @@ export class BaseClient implements QueryExecutor {
 
       // Receive server response
       const response = await this._recvMsg();
-      if (!response) throw new Error('No handshake response from server');
-
-      const version = response.readUInt32LE(0);
-      const serverProtocol = response.readUInt32LE(4);
-
-      Logger.trace('Received server handshake:', { version, serverProtocol });
-
-      if (version !== PROTOCOL_VERSION) {
-        Logger.warn(`Protocol version mismatch - client: ${PROTOCOL_VERSION}, server: ${version}`);
+      if (!response) {
+        // For handshake, we do need a response to verify protocol version
+        // Clean up on handshake failure
+        Logger.debug('_connect: No handshake response, will retry connection');
+        if (this.socket) {
+          this.connectionPool.removeConnection(poolKey, this.socket);
+          this.socket.destroy();
+          this.socket = null;
+        }
+        this.connected = false;
+        throw new Error('No handshake response from server');
       }
 
-      if (serverProtocol !== protocol) {
-        this.socket.destroy();
+      try {
+        const version = response.readUInt32LE(0);
+        const serverProtocol = response.readUInt32LE(4);
+
+        Logger.trace('Received server handshake:', { version, serverProtocol });
+
+        if (version !== PROTOCOL_VERSION) {
+          Logger.warn(`Protocol version mismatch - client: ${PROTOCOL_VERSION}, server: ${version}`);
+        }
+
+        if (serverProtocol !== protocol) {
+          if (this.socket) {
+            this.connectionPool.removeConnection(poolKey, this.socket);
+            this.socket.destroy();
+            this.socket = null;
+          }
+          this.connected = false;
+          throw new Error('Server did not accept protocol. Aborting Connection.');
+        }
+      } catch (error) {
+        // Handle buffer reading errors
+        Logger.debug('_connect: Error reading handshake response:', error);
+        if (this.socket) {
+          this.connectionPool.removeConnection(poolKey, this.socket);
+          this.socket.destroy();
+          this.socket = null;
+        }
         this.connected = false;
-        throw new Error('Server did not accept protocol. Aborting Connection.');
+        throw new Error('Invalid handshake response from server');
       }
 
       // If SSL is enabled, upgrade the connection
@@ -826,14 +853,8 @@ export class BaseClient implements QueryExecutor {
                 this.queryComplete = true;
                 return [this.lastResponse, responseBlobArray];
               } else {
-                if (retryCount < maxRetries) {
-                  Logger.debug(`Empty response string on attempt ${retryCount + 1}/${maxRetries + 1}, retrying...`);
-                  const delay = baseDelay * Math.pow(2, retryCount) * (0.5 + Math.random());
-                  await new Promise(resolve => setTimeout(resolve, delay));
-                  retryCount++;
-                  continue;
-                }
-                Logger.debug('Empty response received from server');
+                // Empty response is valid
+                this.queryComplete = true;
                 return [null, []];
               }
             } catch (e) {
@@ -848,7 +869,8 @@ export class BaseClient implements QueryExecutor {
               retryCount++;
               continue;
             }
-            Logger.debug('No response buffer received from server');
+            // No response buffer is also valid
+            this.queryComplete = true;
             return [null, []];
           }
         }
@@ -882,13 +904,16 @@ export class BaseClient implements QueryExecutor {
         throw error;
       } finally {
         if (this.socket) {
+          const poolKey = `${this.config.host}:${this.config.port}`;
           if (this.queryComplete) {
+            // Only keep the connection in the pool if the query completed successfully
             this.connectionPool.markBusy(poolKey, this.socket, false);
-          } else if (!this.socket.writable || this.socket.destroyed) {
-            // Only remove connection if socket is actually in a bad state
+          } else {
+            // If query didn't complete, remove the connection from pool
             this.connectionPool.removeConnection(poolKey, this.socket);
             this.socket.destroy();
             this.socket = null;
+            this.connected = false;
           }
         }
       }
@@ -1109,11 +1134,27 @@ export class BaseClient implements QueryExecutor {
   }
 
   protected async validateConnection(socket: Socket | TLSSocket): Promise<boolean> {
-    if (!socket.writable || socket.destroyed) {
+    // First do basic socket state checks
+    if (!socket.writable || socket.destroyed || socket.connecting || socket.pending) {
+      Logger.debug('validateConnection: Socket in invalid state:', {
+        writable: socket.writable,
+        destroyed: socket.destroyed,
+        connecting: socket.connecting,
+        pending: socket.pending
+      });
       return false;
+    }
+
+    // For TLS sockets, verify encryption
+    if (this.config.useSsl && socket instanceof TLSSocket) {
+      if (!socket.encrypted || !socket.authorized) {
+        Logger.debug('validateConnection: TLS socket not properly secured');
+        return false;
+      }
     }
     
     this.queryComplete = false;
+    const poolKey = `${this.config.host}:${this.config.port}`;
     
     try {
       // Send a ping/heartbeat query
@@ -1127,28 +1168,34 @@ export class BaseClient implements QueryExecutor {
       const response = await this._recvMsg();
       
       if (!response) {
-        return false;
+        // Empty response is valid for ping
+        this.queryComplete = true;
+        return true;
       }
       
       const responseMessage = QueryMessage.fromBuffer(response);
       const responseStr = responseMessage.getJson();
       if (!responseStr) {
-        return false;
+        // Empty response string is also valid
+        this.queryComplete = true;
+        return true;
       }
       
       const pingResponse = JSON.parse(responseStr);
       this.queryComplete = true;
-      return Array.isArray(pingResponse) && 
-             pingResponse[0]?.Ping?.status === 0;
+      
+      const isValid = Array.isArray(pingResponse) && pingResponse[0]?.Ping?.status === 0;
+      if (!isValid) {
+        Logger.debug('validateConnection: Invalid ping response:', pingResponse);
+      }
+      return isValid;
     } catch (error) {
-      Logger.debug('Connection validation failed:', error);
+      Logger.debug('validateConnection failed:', error);
       return false;
     } finally {
-      if (this.socket && !this.queryComplete) {
-        const poolKey = `${this.config.host}:${this.config.port}`;
-        this.connectionPool.removeConnection(poolKey, this.socket);
-        this.socket.destroy();
-        this.socket = null;
+      if (!this.queryComplete) {
+        this.connectionPool.removeConnection(poolKey, socket);
+        socket.destroy();
       }
     }
   }
