@@ -857,12 +857,20 @@ export class BaseClient implements QueryExecutor {
         return [null, []];
 
       } catch (error) {
-        if (this.socket) {
-          this.connectionPool.removeConnection(poolKey, this.socket);
-          this.socket.destroy();
-          this.socket = null;
+        // Only destroy socket for actual connection errors
+        if (error instanceof Error && 
+            (error.message.includes('ECONNRESET') || 
+             error.message.includes('EPIPE') || 
+             error.message.includes('socket') ||
+             error.message.includes('connection') ||
+             error.message.includes('network'))) {
+          if (this.socket) {
+            this.connectionPool.removeConnection(poolKey, this.socket);
+            this.socket.destroy();
+            this.socket = null;
+          }
+          this.connected = false;
         }
-        this.connected = false;
         
         if (retryCount < maxRetries) {
           Logger.debug(`Query error on attempt ${retryCount + 1}/${maxRetries + 1}, retrying...`, error);
@@ -876,8 +884,8 @@ export class BaseClient implements QueryExecutor {
         if (this.socket) {
           if (this.queryComplete) {
             this.connectionPool.markBusy(poolKey, this.socket, false);
-          } else {
-            // If query didn't complete successfully, remove the connection
+          } else if (!this.socket.writable || this.socket.destroyed) {
+            // Only remove connection if socket is actually in a bad state
             this.connectionPool.removeConnection(poolKey, this.socket);
             this.socket.destroy();
             this.socket = null;
