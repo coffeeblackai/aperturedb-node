@@ -4,7 +4,7 @@ import type { ApertureConfig } from '../types.js';
 
 describe('Descriptor Operations', () => {
   let client: ApertureClient;
-  
+
   beforeAll(async () => {
     const config: ApertureConfig = {
       host: process.env.APERTURE_HOST!,
@@ -79,7 +79,7 @@ describe('Descriptor Operations', () => {
       test('should find descriptor by label', async () => {
         // Add a small delay to ensure the descriptor is indexed
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         const descriptors = await client.descriptors.findDescriptors(undefined, {
           set: testDescriptorSet.name,
           labels: true,
@@ -105,6 +105,8 @@ describe('Descriptor Operations', () => {
         expect(similarDescriptors.length).toBe(1);
         expect(similarDescriptors[0]._label).toBe(testDescriptor.label);
         expect(similarDescriptors[0]._distance).toBeDefined();
+        // Blob should not be returned by default
+        expect(similarDescriptors[0]._blob).toBeUndefined();
       });
 
       test('should return empty array for non-existent descriptor', async () => {
@@ -129,6 +131,24 @@ describe('Descriptor Operations', () => {
 
         expect(descriptors.length).toBe(0);
       });
+
+      test('should get blobs when requested explicitly', async () => {
+        const similarDescriptors = await client.descriptors.findDescriptors(
+          testDescriptor.blob,
+          {
+            set: testDescriptorSet.name,
+            k_neighbors: 1,
+            distances: true,
+            labels: true,
+            blobs: true
+          }
+        );
+
+        expect(similarDescriptors.length).toBe(1);
+        expect(similarDescriptors[0]._label).toBe(testDescriptor.label);
+        expect(similarDescriptors[0]._distance).toBeDefined();
+        expect(similarDescriptors[0]._blob).toBeDefined();
+      });
     });
 
     afterAll(async () => {
@@ -142,4 +162,4 @@ describe('Descriptor Operations', () => {
       }
     });
   });
-}); 
+});
