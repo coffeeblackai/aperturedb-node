@@ -9,8 +9,8 @@ export class EntityClient {
   }
 
   private isFindEntityResponse(response: unknown): response is { FindEntity: { entities: Omit<EntityMetadata, 'class'>[]; returned: number; status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindEntity' in response[0] &&
            typeof response[0].FindEntity === 'object' &&
            response[0].FindEntity !== null &&
@@ -19,8 +19,8 @@ export class EntityClient {
   }
 
   private isAddEntityResponse(response: unknown): response is { AddEntity: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'AddEntity' in response[0] &&
            typeof response[0].AddEntity === 'object' &&
            response[0].AddEntity !== null &&
@@ -29,8 +29,8 @@ export class EntityClient {
   }
 
   private isDeleteEntityResponse(response: unknown): response is { DeleteEntity: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteEntity' in response[0] &&
            typeof response[0].DeleteEntity === 'object' &&
            response[0].DeleteEntity !== null &&
@@ -38,8 +38,8 @@ export class EntityClient {
   }
 
   private isUpdateEntityResponse(response: unknown): response is { UpdateEntity: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'UpdateEntity' in response[0] &&
            typeof response[0].UpdateEntity === 'object' &&
            response[0].UpdateEntity !== null &&
@@ -87,7 +87,7 @@ export class EntityClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isAddEntityResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return {
@@ -108,7 +108,7 @@ export class EntityClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteEntityResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 
@@ -126,7 +126,7 @@ export class EntityClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isUpdateEntityResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 }

@@ -51,10 +51,10 @@ export class ConnectionClient {
            });
   }
 
-  async findConnections(options: { 
-    with_class?: string; 
-    constraints?: Record<string, any>; 
-    results?: Record<string, any>; 
+  async findConnections(options: {
+    with_class?: string;
+    constraints?: Record<string, any>;
+    results?: Record<string, any>;
     uniqueids?: string[];
     src?: string | Reference;
     dst?: string | Reference;
@@ -79,7 +79,7 @@ export class ConnectionClient {
     }];
 
     const [response] = await this.baseClient.query(query, []);
-    if (!this.isChainedResponse(response) || 
+    if (!this.isChainedResponse(response) ||
         !response[0].FindConnection ||
         !('connections' in response[0].FindConnection)) {
       return [];
@@ -91,7 +91,7 @@ export class ConnectionClient {
     }));
   }
 
-  async addConnection(input: { 
+  async addConnection(input: {
     class: string;
     src: string | Reference;
     dst: string | Reference;
@@ -111,10 +111,10 @@ export class ConnectionClient {
     }];
 
     const [response] = await this.baseClient.query(query, []);
-    if (!this.isChainedResponse(response) || 
+    if (!this.isChainedResponse(response) ||
         !response[0].AddConnection ||
         response[0].AddConnection.status !== 0) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return {
@@ -152,7 +152,7 @@ export class ConnectionClient {
     }
   }
 
-  async deleteConnection(input: { 
+  async deleteConnection(input: {
     ref?: number;
     with_class?: string;
     constraints?: Record<string, any>;
@@ -212,7 +212,7 @@ export class ConnectionClient {
     }
   }
 
-  async addConnectionWithObjects(input: { 
+  async addConnectionWithObjects(input: {
     connectionClass: string;
     sourceObject: {
       operation: 'Add' | 'Find';
@@ -244,7 +244,7 @@ export class ConnectionClient {
 
     const createOperation = (obj: typeof input.sourceObject, defaultRef: number) => {
       const ref = obj.ref || defaultRef;
-      
+
       if (obj.operation === 'Add') {
         const base = {
           "_ref": ref,
@@ -279,7 +279,7 @@ export class ConnectionClient {
     }];
 
     const [response] = await this.baseClient.query(query, []);
-    
+
     if (!this.isChainedResponse(response) ||
         !response[0][`${input.sourceObject.operation}${input.sourceObject.type}`] ||
         !response[1][`${input.targetObject.operation}${input.targetObject.type}`] ||
@@ -293,7 +293,7 @@ export class ConnectionClient {
     const createReturnObject = (obj: typeof input.sourceObject, response: ChainedOperationResponse) => {
       const operationKey = `${obj.operation}${obj.type}`;
       const operationResponse = response[operationKey];
-      
+
       if (obj.operation === 'Find' && operationResponse) {
         // For Find operations, return the found object
         return {
@@ -326,4 +326,4 @@ export class ConnectionClient {
       }
     };
   }
-} 
+}

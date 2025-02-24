@@ -17,17 +17,17 @@ export class PolygonClient {
       Logger.error('Response is not an array:', response);
       throw new Error('Invalid response format');
     }
-    
+
     if (response.length !== 2) {
       Logger.error('Response array length is not 2:', response.length);
       throw new Error('Invalid response length');
     }
-    
+
     if (!('FindImage' in response[0])) {
       Logger.error('First element missing FindImage:', response[0]);
       throw new Error('Invalid response format');
     }
-    
+
     if (!('AddPolygon' in response[1])) {
       Logger.error('Second element missing AddPolygon:', response[1]);
       throw new Error('Invalid response format');
@@ -35,29 +35,29 @@ export class PolygonClient {
 
     const findImage = response[0].FindImage;
     const addPolygon = response[1].AddPolygon;
-    
+
     if (typeof findImage !== 'object' || findImage === null) {
       Logger.error('FindImage is not an object:', findImage);
       throw new Error('Invalid FindImage format');
     }
-    
+
     if (typeof addPolygon !== 'object' || addPolygon === null) {
       Logger.error('AddPolygon is not an object:', addPolygon);
       throw new Error('Invalid AddPolygon format');
     }
-    
+
     // if (!Array.isArray(findImage.entities) || findImage.entities.length === 0) {
     //   Logger.error('FindImage entities is not an array or is empty:', findImage.entities);
     //   throw new Error('No matching image found');
     // }
-    
+
 
     return true;
   }
 
   async addPolygon(input: Omit<CreatePolygonInput, 'image_ref'> & { constraints: Record<string, any> }): Promise<PolygonMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.constraints || Object.keys(input.constraints).length === 0) {
       throw new Error('constraints are required for addPolygon');
     }
@@ -83,7 +83,7 @@ export class PolygonClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isChainedAddPolygonResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     if (response[0].FindImage.status !== 0 || response[1].AddPolygon.status !== 0) {
@@ -101,7 +101,7 @@ export class PolygonClient {
 
   async findPolygon(options?: FindPolygonOptions): Promise<PolygonMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindPolygon": {
         "constraints": options?.constraints,
@@ -127,7 +127,7 @@ export class PolygonClient {
 
   async findPolygons(options?: FindPolygonOptions & QueryOptions): Promise<PolygonMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindPolygon": {
         "constraints": options?.constraints,
@@ -156,7 +156,7 @@ export class PolygonClient {
 
   async deletePolygon(constraints: Record<string, any>): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeletePolygon": {
         "constraints": constraints,
@@ -171,4 +171,4 @@ export class PolygonClient {
 
     await this.baseClient.query<DeletePolygonResponse>(query, []);
   }
-} 
+}

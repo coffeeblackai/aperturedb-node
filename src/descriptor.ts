@@ -20,8 +20,8 @@ export class DescriptorClient {
   }
 
   private isAddDescriptorResponse(response: unknown): response is [{ AddDescriptor: { status: number } }] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'AddDescriptor' in response[0] &&
            typeof response[0].AddDescriptor === 'object' &&
            response[0].AddDescriptor !== null &&
@@ -29,8 +29,8 @@ export class DescriptorClient {
   }
 
   private isFindDescriptorResponse(response: unknown): response is [{ FindDescriptor: { entities: DescriptorMetadata[]; returned: number; status: number } }] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindDescriptor' in response[0] &&
            typeof response[0].FindDescriptor === 'object' &&
            response[0].FindDescriptor !== null &&
@@ -39,8 +39,8 @@ export class DescriptorClient {
   }
 
   private isFindDescriptorBatchResponse(response: unknown): response is [{ FindDescriptorBatch: { descriptors: DescriptorMetadata[]; returned: number; status: number } }] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindDescriptorBatch' in response[0] &&
            typeof response[0].FindDescriptorBatch === 'object' &&
            response[0].FindDescriptorBatch !== null &&
@@ -49,8 +49,8 @@ export class DescriptorClient {
   }
 
   private isClassifyDescriptorResponse(response: unknown): response is [{ ClassifyDescriptor: { classifications: Record<string, number>; status: number } }] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'ClassifyDescriptor' in response[0] &&
            typeof response[0].ClassifyDescriptor === 'object' &&
            response[0].ClassifyDescriptor !== null &&
@@ -59,8 +59,8 @@ export class DescriptorClient {
   }
 
   private isDeleteDescriptorResponse(response: unknown): response is [{ DeleteDescriptor: { status: number } }] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteDescriptor' in response[0] &&
            typeof response[0].DeleteDescriptor === 'object' &&
            response[0].DeleteDescriptor !== null &&
@@ -69,7 +69,7 @@ export class DescriptorClient {
 
   async addDescriptor(input: CreateDescriptorInput): Promise<DescriptorMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.set) {
       throw new Error('set is required for addDescriptor');
     }
@@ -85,7 +85,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, [this.float32ArrayToBuffer(input.blob)]);
     if (!this.isAddDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     const metadata: DescriptorMetadata = {
@@ -106,11 +106,11 @@ export class DescriptorClient {
 
   async findDescriptors(descriptor?: Float32Array, options?: FindDescriptorOptions & QueryOptions): Promise<DescriptorMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (descriptor && !options?.set) {
       throw new Error('set is required for k-nearest neighbor search');
     }
-    
+
     const query = [{
       "FindDescriptor": {
         "constraints": options?.constraints,
@@ -154,11 +154,11 @@ export class DescriptorClient {
 
   async findDescriptorBatch(descriptors: Float32Array[], options?: FindDescriptorBatchOptions & QueryOptions): Promise<DescriptorMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!options?.set) {
       throw new Error('set is required for findDescriptorBatch');
     }
-    
+
     const query = [{
       "FindDescriptorBatch": {
         "constraints": options?.constraints,
@@ -185,11 +185,11 @@ export class DescriptorClient {
 
   async classifyDescriptor(descriptor: Float32Array, options: ClassifyDescriptorOptions): Promise<Record<string, number>> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!options.set) {
       throw new Error('set is required for classifyDescriptor');
     }
-    
+
     const query = [{
       "ClassifyDescriptor": {
         "set": options.set,
@@ -200,7 +200,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, [this.float32ArrayToBuffer(descriptor)]);
     if (!this.isClassifyDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return response[0].ClassifyDescriptor.classifications;
@@ -208,7 +208,7 @@ export class DescriptorClient {
 
   async deleteDescriptor(options: { set?: string; constraints?: Record<string, any>; uniqueids?: string[] } = {}): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteDescriptor": {
         "set": options.set,
@@ -218,7 +218,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 }

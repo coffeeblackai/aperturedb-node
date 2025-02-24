@@ -14,8 +14,8 @@ export class ImageClient {
   }
 
   private isAddImageResponse(response: unknown): response is { AddImage: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'AddImage' in response[0] &&
            typeof response[0].AddImage === 'object' &&
            response[0].AddImage !== null &&
@@ -23,8 +23,8 @@ export class ImageClient {
   }
 
   private isFindImageResponse(response: unknown): response is { FindImage: { entities: ImageMetadata[]; returned: number; status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindImage' in response[0] &&
            typeof response[0].FindImage === 'object' &&
            response[0].FindImage !== null &&
@@ -33,8 +33,8 @@ export class ImageClient {
   }
 
   private isDeleteImageResponse(response: unknown): response is { DeleteImage: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteImage' in response[0] &&
            typeof response[0].DeleteImage === 'object' &&
            response[0].DeleteImage !== null &&
@@ -43,7 +43,7 @@ export class ImageClient {
 
   async addImage(input: CreateImageInput): Promise<ImageMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.url && !input.blob) {
       throw new Error('Either url or blob is required for addImage');
     }
@@ -58,7 +58,7 @@ export class ImageClient {
     const blobs = input.blob ? [input.blob] : [];
     const [response] = await this.baseClient.query(query, blobs);
     if (!this.isAddImageResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return {
@@ -71,7 +71,7 @@ export class ImageClient {
 
   async findImage(options?: FindImageOptions): Promise<ImageMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindImage": {
         "constraints": options?.constraints,
@@ -93,7 +93,7 @@ export class ImageClient {
 
   async findImages(options?: FindImageOptions & QueryOptions): Promise<ImageMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindImage": {
         "constraints": options?.constraints,
@@ -118,7 +118,7 @@ export class ImageClient {
 
   async deleteImage(constraints: Record<string, any>): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteImage": {
         "constraints": constraints
@@ -127,7 +127,7 @@ export class ImageClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteImageResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
-} 
+}

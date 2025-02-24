@@ -13,8 +13,8 @@ export class DescriptorSetClient {
   }
 
   private isAddDescriptorSetResponse(response: unknown): response is { AddDescriptorSet: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'AddDescriptorSet' in response[0] &&
            typeof response[0].AddDescriptorSet === 'object' &&
            response[0].AddDescriptorSet !== null &&
@@ -22,8 +22,8 @@ export class DescriptorSetClient {
   }
 
   private isDeleteDescriptorSetResponse(response: unknown): response is { DeleteDescriptorSet: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteDescriptorSet' in response[0] &&
            typeof response[0].DeleteDescriptorSet === 'object' &&
            response[0].DeleteDescriptorSet !== null &&
@@ -32,10 +32,10 @@ export class DescriptorSetClient {
 
   private isFindDescriptorSetResponse(response: unknown): response is { FindDescriptorSet: { entities: DescriptorSetResponse[]; returned: number; status: number } }[] {
     if (!Array.isArray(response) || response.length === 0) return false;
-    
+
     const first = response[0];
     if (!first || typeof first !== 'object' || !('FindDescriptorSet' in first)) return false;
-    
+
     const findResponse = first.FindDescriptorSet;
     if (!findResponse || typeof findResponse !== 'object') return false;
 
@@ -45,9 +45,9 @@ export class DescriptorSetClient {
     if (!('returned' in findResponse) || typeof findResponse.returned !== 'number') return false;
 
     // Check each entity has the required fields based on the query options
-    return findResponse.entities.every((entity: Record<string, unknown>) => 
-      typeof entity === 'object' && 
-      entity !== null && 
+    return findResponse.entities.every((entity: Record<string, unknown>) =>
+      typeof entity === 'object' &&
+      entity !== null &&
       '_name' in entity &&
       (
         // Basic fields
@@ -64,7 +64,7 @@ export class DescriptorSetClient {
 
   async addDescriptorSet(input: Partial<DescriptorSet>): Promise<DescriptorSetResponse> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.name) {
       throw new Error('name is required for addDescriptorSet');
     }
@@ -80,7 +80,7 @@ export class DescriptorSetClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isAddDescriptorSetResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return {
@@ -157,7 +157,7 @@ export class DescriptorSetClient {
 
   async deleteDescriptorSet(options: { with_name?: string; constraints?: Record<string, any> } = {}): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteDescriptorSet": {
         with_name: options.with_name,
@@ -167,7 +167,7 @@ export class DescriptorSetClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteDescriptorSetResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
-} 
+}
