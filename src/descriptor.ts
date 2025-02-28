@@ -85,7 +85,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, [this.float32ArrayToBuffer(input.blob)]);
     if (!this.isAddDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     const metadata: DescriptorMetadata = {
@@ -216,7 +216,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, [this.float32ArrayToBuffer(descriptor)]);
     if (!this.isClassifyDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     return response[0].ClassifyDescriptor.classifications;
@@ -234,7 +234,7 @@ export class DescriptorClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteDescriptorResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 }

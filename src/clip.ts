@@ -23,17 +23,17 @@ export class ClipClient {
       Logger.error('Response is not an array:', response);
       throw new Error('Invalid response format');
     }
-    
+
     if (response.length !== 2) {
       Logger.error('Response array length is not 2:', response.length);
       throw new Error('Invalid response length');
     }
-    
+
     if (!('FindVideo' in response[0])) {
       Logger.error('First element missing FindVideo:', response[0]);
       throw new Error('Invalid response format');
     }
-    
+
     if (!('AddClip' in response[1])) {
       Logger.error('Second element missing AddClip:', response[1]);
       throw new Error('Invalid response format');
@@ -41,22 +41,22 @@ export class ClipClient {
 
     const findVideo = response[0].FindVideo;
     const addClip = response[1].AddClip;
-    
+
     if (typeof findVideo !== 'object' || findVideo === null) {
       Logger.error('FindVideo is not an object:', findVideo);
       throw new Error('Invalid FindVideo format');
     }
-    
+
     if (typeof addClip !== 'object' || addClip === null) {
       Logger.error('AddClip is not an object:', addClip);
       throw new Error('Invalid AddClip format');
     }
-    
+
     if (!('status' in findVideo) || !('entities' in findVideo)) {
       Logger.error('FindVideo missing required properties:', findVideo);
       throw new Error('Invalid FindVideo format');
     }
-    
+
     if (!('status' in addClip)) {
       Logger.error('AddClip missing status:', addClip);
       throw new Error('Invalid AddClip format');
@@ -66,8 +66,8 @@ export class ClipClient {
   }
 
   private isFindClipResponse(response: unknown): response is { FindClip: { entities: ClipMetadata[]; returned: number; status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindClip' in response[0] &&
            typeof response[0].FindClip === 'object' &&
            response[0].FindClip !== null &&
@@ -76,8 +76,8 @@ export class ClipClient {
   }
 
   private isUpdateClipResponse(response: unknown): response is { UpdateClip: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'UpdateClip' in response[0] &&
            typeof response[0].UpdateClip === 'object' &&
            response[0].UpdateClip !== null &&
@@ -85,8 +85,8 @@ export class ClipClient {
   }
 
   private isDeleteClipResponse(response: unknown): response is { DeleteClip: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteClip' in response[0] &&
            typeof response[0].DeleteClip === 'object' &&
            response[0].DeleteClip !== null &&
@@ -95,7 +95,7 @@ export class ClipClient {
 
   async addClip(input: CreateClipInput): Promise<ClipMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.video_ref) {
       throw new Error('video_ref is required for addClip');
     }
@@ -127,7 +127,7 @@ export class ClipClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isChainedAddClipResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     if (response[0].FindVideo.status !== 0 || response[1].AddClip.status !== 0) {
@@ -148,7 +148,7 @@ export class ClipClient {
 
   async findClip(options?: FindClipOptions): Promise<ClipMetadata | undefined> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindClip": {
         "video_ref": options?.video_ref,
@@ -171,7 +171,7 @@ export class ClipClient {
 
   async findClips(options?: FindClipOptions & QueryOptions): Promise<ClipMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindClip": {
         "video_ref": options?.video_ref,
@@ -205,7 +205,7 @@ export class ClipClient {
     }
   ): Promise<ClipMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindVideo": {
         "_ref": 1,
@@ -257,7 +257,7 @@ export class ClipClient {
 
   async updateClip(options: UpdateClipInput): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "UpdateClip": {
         "properties": options.properties,
@@ -268,13 +268,13 @@ export class ClipClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isUpdateClipResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 
   async deleteClip(constraints: Record<string, any>): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteClip": {
         "constraints": constraints
@@ -283,7 +283,7 @@ export class ClipClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteClipResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
-} 
+}

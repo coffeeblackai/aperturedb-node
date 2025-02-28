@@ -21,17 +21,17 @@ export class BoundingBoxClient {
       console.error('Response is not an array:', response);
       return false;
     }
-    
+
     if (response.length !== 2) {
       console.error('Response array length is not 2:', response.length);
       return false;
     }
-    
+
     if (!response[0] || !('FindImage' in response[0])) {
       console.error('First element missing FindImage:', response[0]);
       return false;
     }
-    
+
     if (!response[1] || !('AddBoundingBox' in response[1])) {
       console.error('Second element missing AddBoundingBox:', response[1]);
       return false;
@@ -39,22 +39,22 @@ export class BoundingBoxClient {
 
     const findImage = response[0].FindImage;
     const addBoundingBox = response[1].AddBoundingBox;
-    
+
     if (!findImage || typeof findImage !== 'object') {
       console.error('FindImage is not an object:', findImage);
       return false;
     }
-    
+
     if (!addBoundingBox || typeof addBoundingBox !== 'object') {
       console.error('AddBoundingBox is not an object:', addBoundingBox);
       return false;
     }
-    
+
     if (!('status' in findImage) || !('returned' in findImage)) {
       console.error('FindImage missing required properties:', findImage);
       return false;
     }
-    
+
     if (!('status' in addBoundingBox)) {
       console.error('AddBoundingBox missing required properties:', addBoundingBox);
       return false;
@@ -65,8 +65,8 @@ export class BoundingBoxClient {
 
   async addBoundingBox(input: Omit<CreateBoundingBoxInput, 'image_ref'> & { imageId: string }): Promise<BoundingBoxMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
-    if (typeof input.x !== 'number' || typeof input.y !== 'number' || 
+
+    if (typeof input.x !== 'number' || typeof input.y !== 'number' ||
         typeof input.width !== 'number' || typeof input.height !== 'number' ||
         input.x === 0 || input.y === 0 || input.width === 0 || input.height === 0) {
       throw new Error('x, y, width, and height are required for addBoundingBox');
@@ -100,7 +100,7 @@ export class BoundingBoxClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isChainedAddBoundingBoxResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     if (response[0].FindImage.status !== 0 || response[1].AddBoundingBox.status !== 0) {
@@ -122,7 +122,7 @@ export class BoundingBoxClient {
 
   async findBoundingBox(options?: FindBoundingBoxOptions): Promise<BoundingBoxMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindBoundingBox": {
         "constraints": options?.constraints,
@@ -148,7 +148,7 @@ export class BoundingBoxClient {
 
   async findBoundingBoxes(options?: FindBoundingBoxOptions & QueryOptions): Promise<BoundingBoxMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindBoundingBox": {
         "constraints": options?.constraints,
@@ -177,7 +177,7 @@ export class BoundingBoxClient {
 
   async deleteBoundingBox(constraints: Record<string, any>): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteBoundingBox": {
         "constraints": constraints
@@ -191,13 +191,13 @@ export class BoundingBoxClient {
     }];
 
     const [response] = await this.baseClient.query<DeleteBoundingBoxResponse>(query, []);
-    
+
     if (!response || !('DeleteBoundingBox' in response[0])) {
       throw new Error('Invalid response from server for delete operation');
     }
-    
+
     if (response[0].DeleteBoundingBox.status !== 0) {
       throw new Error('Failed to delete bounding box');
     }
   }
-} 
+}

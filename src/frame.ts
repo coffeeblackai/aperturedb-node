@@ -23,12 +23,12 @@ export class FrameClient {
       Logger.error('Response is not an array:', response);
       throw new Error('Invalid response format');
     }
-    
+
     if (response.length !== 2) {
       Logger.error('Response array length is not 2:', response.length);
       throw new Error('Invalid response length');
     }
-    
+
     if (!('FindVideo' in response[0])) {
       Logger.trace('Debug - response[0]:', response[0]);
       Logger.trace('Debug - FindVideo in response[0]:', 'FindVideo' in response[0]);
@@ -36,7 +36,7 @@ export class FrameClient {
       Logger.error('First element missing FindVideo:', response[0]);
       throw new Error('Invalid response format');
     }
-    
+
     if (!('AddFrame' in response[1])) {
       Logger.error('Second element missing AddFrame:', response[1]);
       throw new Error('Invalid response format');
@@ -44,24 +44,24 @@ export class FrameClient {
 
     const findVideo = response[0].FindVideo;
     const addFrame = response[1].AddFrame;
-    
+
     if (typeof findVideo !== 'object' || findVideo === null) {
       Logger.error('FindVideo is not an object:', findVideo);
       throw new Error('Invalid FindVideo format');
     }
-    
+
     if (typeof addFrame !== 'object' || addFrame === null) {
       Logger.error('AddFrame is not an object:', addFrame);
       throw new Error('Invalid AddFrame format');
     }
-    
+
 
     return true;
   }
 
   private isFindFrameResponse(response: unknown): response is { FindFrame: { entities: FrameMetadata[]; returned: number; status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'FindFrame' in response[0] &&
            typeof response[0].FindFrame === 'object' &&
            response[0].FindFrame !== null &&
@@ -70,8 +70,8 @@ export class FrameClient {
   }
 
   private isUpdateFrameResponse(response: unknown): response is { UpdateFrame: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'UpdateFrame' in response[0] &&
            typeof response[0].UpdateFrame === 'object' &&
            response[0].UpdateFrame !== null &&
@@ -79,8 +79,8 @@ export class FrameClient {
   }
 
   private isDeleteFrameResponse(response: unknown): response is { DeleteFrame: { status: number } }[] {
-    return Array.isArray(response) && 
-           response.length > 0 && 
+    return Array.isArray(response) &&
+           response.length > 0 &&
            'DeleteFrame' in response[0] &&
            typeof response[0].DeleteFrame === 'object' &&
            response[0].DeleteFrame !== null &&
@@ -89,7 +89,7 @@ export class FrameClient {
 
   async addFrame(input: CreateFrameInput): Promise<FrameMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     if (!input.video_ref && !input.constraints) {
       throw new Error('Either video_ref or constraints must be provided');
     }
@@ -104,7 +104,7 @@ export class FrameClient {
         "_ref": 1,
         "unique": true,
         "blobs": false,
-        "constraints": input.constraints 
+        "constraints": input.constraints
       }
     }, {
       "AddFrame": {
@@ -119,7 +119,7 @@ export class FrameClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isChainedAddFrameResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
 
     if (response[0].FindVideo.status !== 0 || response[1].AddFrame.status !== 0) {
@@ -139,7 +139,7 @@ export class FrameClient {
 
   async findFrame(options?: FindFrameOptions): Promise<FrameMetadata> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindFrame": {
         "video_ref": options?.video_ref,
@@ -172,7 +172,7 @@ export class FrameClient {
 
   async findFrames(options?: FindFrameOptions & QueryOptions): Promise<FrameMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindFrame": {
         "video_ref": options?.video_ref,
@@ -216,7 +216,7 @@ export class FrameClient {
     }
   ): Promise<FrameMetadata[]> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "FindVideo": {
         "_ref": 1,
@@ -254,7 +254,7 @@ export class FrameClient {
     }];
 
     const [response] = await this.baseClient.query(query, []);
-    
+
     // Check if response is an array with two elements
     if (!Array.isArray(response) || response.length !== 2) {
       return [];
@@ -287,7 +287,7 @@ export class FrameClient {
 
   async updateFrame(options: UpdateFrameInput): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "UpdateFrame": {
         "properties": options.properties,
@@ -298,13 +298,13 @@ export class FrameClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isUpdateFrameResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
 
   async deleteFrame(constraints: Record<string, any>): Promise<void> {
     await this.baseClient.ensureAuthenticated();
-    
+
     const query = [{
       "DeleteFrame": {
         "constraints": constraints
@@ -313,7 +313,7 @@ export class FrameClient {
 
     const [response] = await this.baseClient.query(query, []);
     if (!this.isDeleteFrameResponse(response)) {
-      throw new Error('Invalid response from server');
+      throw new Error(`Invalid response from server : ${JSON.stringify(response)}`);
     }
   }
-} 
+}

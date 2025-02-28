@@ -217,7 +217,7 @@ export class BaseClient implements QueryExecutor {
       retryMaxAttempts: config?.retryMaxAttempts ?? 3,
     };
 
-    Logger.info('Initialized with config:', { 
+    Logger.info('Initialized with config:', {
       ...this.config,
       password: '***' // Don't log password
     });
@@ -267,7 +267,7 @@ export class BaseClient implements QueryExecutor {
   protected async _connect(): Promise<void> {
     const CONNECT_TIMEOUT = 15000;
     const poolKey = `${this.config.host}:${this.config.port}`;
-    
+
     try {
       // Check connection pool first
       const pooledSocket = this.connectionPool.getConnection(poolKey);
@@ -288,17 +288,17 @@ export class BaseClient implements QueryExecutor {
       // Create new connection if none available in pool
       this.socket = new Socket();
       this.socket.setNoDelay(true);
-      
+
       if (this.config.useKeepalive) {
         this.socket.setKeepAlive(true, 1000);
       }
 
       await new Promise<void>((resolve, reject) => {
         if (!this.socket) return reject(new Error('Socket not initialized'));
-        
+
         const port = this.config.port ?? 55555;
         const host = this.config.host;
-        
+
         // Set connection timeout
         const connectTimeout = setTimeout(() => {
           this.socket?.destroy();
@@ -331,9 +331,9 @@ export class BaseClient implements QueryExecutor {
       const handshake = Buffer.alloc(8);
       handshake.writeUInt32LE(PROTOCOL_VERSION, 0);
       handshake.writeUInt32LE(protocol, 4);
-      
+
       Logger.trace('Sending protocol handshake:', { version: PROTOCOL_VERSION, protocol });
-      
+
       await this._sendMsg(handshake);
 
       // Receive server response
@@ -386,7 +386,7 @@ export class BaseClient implements QueryExecutor {
       if (this.config.useSsl) {
         try {
           Logger.debug('Starting TLS upgrade...');
-          
+
           const tlsSocket = await new Promise<TLSSocket>((resolve, reject) => {
             const socket = tls.connect({
               socket: this.socket as Socket,
@@ -426,7 +426,7 @@ export class BaseClient implements QueryExecutor {
           // Replace the socket with the TLS socket
           this.socket = tlsSocket;
           Logger.debug('TLS handshake completed successfully');
-          
+
           // Verify socket is connected and ready
           if (!this.socket.connecting && (this.socket as TLSSocket).encrypted) {
             Logger.debug('TLS socket ready for communication');
@@ -456,11 +456,11 @@ export class BaseClient implements QueryExecutor {
         this.socket = null;
       }
       this.connected = false;
-      
+
       if (error instanceof Error) {
         // Check if this is a connection error that should be suppressed
         const now = Date.now();
-        if (this.lastQueryTimestamp && 
+        if (this.lastQueryTimestamp &&
             (now - this.lastQueryTimestamp) < this.queryConnectionErrorSuppressionDelta) {
           Logger.debug('Suppressing connection error due to recent query');
         } else {
@@ -501,7 +501,7 @@ export class BaseClient implements QueryExecutor {
       const onError = (err: Error) => {
         cleanup();
         this.connected = false;
-        
+
         // Special handling for EPIPE and other connection errors
         if (err.message.includes('EPIPE') || err.message.includes('ECONNRESET')) {
           reject(new Error('Connection lost during write'));
@@ -581,7 +581,7 @@ export class BaseClient implements QueryExecutor {
             if (lengthBuffer.length >= 4) {
               messageLength = lengthBuffer.readUInt32LE(0);
               Logger.trace('_recvMsg: Message length from prefix:', messageLength);
-              
+
               // Handle empty message
               if (messageLength === 0) {
                 Logger.trace('_recvMsg: Empty message received');
@@ -700,7 +700,7 @@ export class BaseClient implements QueryExecutor {
 
   protected async _authenticate(user: string, password: string = '', token: string = ''): Promise<void> {
     Logger.debug('_authenticate: Starting authentication process', { user, hasPassword: !!password, hasToken: !!token });
-    
+
     // Match Python's query structure exactly
     const query = [{
       "Authenticate": {
@@ -732,7 +732,7 @@ export class BaseClient implements QueryExecutor {
 
       const sessionInfo = response[0]["Authenticate"];
       Logger.debug('_authenticate: Session info:', { status: sessionInfo["status"], hasToken: !!sessionInfo["session_token"] });
-      
+
       if (sessionInfo["status"] !== 0) {
         Logger.error('_authenticate: Authentication failed', { status: sessionInfo["status"], info: sessionInfo["info"] });
         throw new Error(sessionInfo["info"]);
@@ -839,13 +839,13 @@ export class BaseClient implements QueryExecutor {
         }
 
         const sendResult = await this._sendMsg(queryBuffer);
-        
+
         if (sendResult) {
           const response = await this._recvMsg();
           if (response) {
             const responseMessage = QueryMessage.fromBuffer(response);
             const responseStr = responseMessage.getJson();
-            
+
             try {
               if (responseStr) {
                 this.lastResponse = JSON.parse(responseStr);
@@ -880,9 +880,9 @@ export class BaseClient implements QueryExecutor {
 
       } catch (error) {
         // Only destroy socket for actual connection errors
-        if (error instanceof Error && 
-            (error.message.includes('ECONNRESET') || 
-             error.message.includes('EPIPE') || 
+        if (error instanceof Error &&
+            (error.message.includes('ECONNRESET') ||
+             error.message.includes('EPIPE') ||
              error.message.includes('socket') ||
              error.message.includes('connection') ||
              error.message.includes('network'))) {
@@ -893,7 +893,7 @@ export class BaseClient implements QueryExecutor {
           }
           this.connected = false;
         }
-        
+
         if (retryCount < maxRetries) {
           Logger.debug(`Query error on attempt ${retryCount + 1}/${maxRetries + 1}, retrying...`, error);
           const delay = baseDelay * Math.pow(2, retryCount) * (0.5 + Math.random());
@@ -954,7 +954,7 @@ export class BaseClient implements QueryExecutor {
     return this.sharedData.lock.acquire('session', async () => {
       Logger.debug('ensureAuthenticated: Starting authentication check');
       Logger.debug('ensureAuthenticated: Connection status:', { connected: this.connected, authenticated: this.authenticated, shouldAuthenticate: this.shouldAuthenticate });
-      
+
       // First ensure we're connected
       if (!this.connected) {
         Logger.debug('ensureAuthenticated: Not connected, connecting...');
@@ -1076,7 +1076,9 @@ export class BaseClient implements QueryExecutor {
   public async query<T = any>(q: any, blobs: Buffer[] = []): Promise<[T, Buffer[]]> {
     await this.ensureAuthenticated();
     const start = Date.now();
+    Logger.debug(`Query: ${JSON.stringify(q)}, Blobs count: ${blobs.length}`);
     const [response, responseBlobs] = await this._query(q, blobs);
+    Logger.debug(`Response: ${JSON.stringify(response)}, Response blobs count: ${responseBlobs.length}`);
     this.lastQueryTime = (Date.now() - start) / 1000;
     this.lastQueryTimestamp = Date.now();
     return [response, responseBlobs];
@@ -1089,7 +1091,7 @@ export class BaseClient implements QueryExecutor {
       if (this.socket) {
         const poolKey = `${this.config.host}:${this.config.port}`;
         this.connectionPool.removeConnection(poolKey, this.socket);
-        
+
         // Properly close the socket
         await new Promise<void>((resolve) => {
           if (!this.socket) {
@@ -1152,10 +1154,10 @@ export class BaseClient implements QueryExecutor {
         return false;
       }
     }
-    
+
     this.queryComplete = false;
     const poolKey = `${this.config.host}:${this.config.port}`;
-    
+
     try {
       // Send a ping/heartbeat query
       const pingQuery = [{ "Ping": {} }];
@@ -1163,16 +1165,16 @@ export class BaseClient implements QueryExecutor {
       if (this.sharedData.session?.sessionToken) {
         queryMessage.setToken(this.sharedData.session.sessionToken);
       }
-      
+
       await this._sendMsg(queryMessage.toBuffer());
       const response = await this._recvMsg();
-      
+
       if (!response) {
         // Empty response is valid for ping
         this.queryComplete = true;
         return true;
       }
-      
+
       const responseMessage = QueryMessage.fromBuffer(response);
       const responseStr = responseMessage.getJson();
       if (!responseStr) {
@@ -1180,10 +1182,10 @@ export class BaseClient implements QueryExecutor {
         this.queryComplete = true;
         return true;
       }
-      
+
       const pingResponse = JSON.parse(responseStr);
       this.queryComplete = true;
-      
+
       const isValid = Array.isArray(pingResponse) && pingResponse[0]?.Ping?.status === 0;
       if (!isValid) {
         Logger.debug('validateConnection: Invalid ping response:', pingResponse);
@@ -1199,4 +1201,4 @@ export class BaseClient implements QueryExecutor {
       }
     }
   }
-} 
+}
